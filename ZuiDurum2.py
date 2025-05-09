@@ -130,7 +130,7 @@ class Player:
 class Obstacle:
     def __init__(self, lane, world_offset=0, scale_boost=1.0):
         self.lane = lane
-        self.base_x = LANE_WIDTH * lane
+        self.base_x = (WIDTH // 2) + (lane - 1) * (LANE_WIDTH)  
         self.x = self.base_x + world_offset
         self.y = 100  # Spawn mais acima
         self.base_speed = random.uniform(2.0, 3.0)  # Velocidade base
@@ -185,21 +185,22 @@ class Obstacle:
         return self.y > 300  # Remove quando passar do novo limite
     
     def collides_with(self, player):
-        if self.lane != player.lane:
+        lane_diff = abs(self.lane - player.lane)
+        if lane_diff > 1:  # Só verifica colisão em faixas adjacentes
             return False
-            
-        # Verifica se está na área de colisão (parte inferior)
+                
         if self.y < player.hitbox_y:
             return False
-            
-        # Calcula raios para colisão circular usando o tamanho atual do obstáculo
-        obstacle_radius = (self.base_width * self.scale) / 2 * 0.8  # 80% da largura para hitbox mais justa
-        player_radius = player.width / 3  # Raio do jogador
+                
+        # Aumenta a área de colisão proporcional à nova largura
+        obstacle_hitbox = (self.base_width * self.scale) * 0.7  # 70% do tamanho visual
+        player_hitbox = LANE_WIDTH * 0.6  # 60% da largura da faixa
         
-        # Distância horizontal entre os centros
+        # Distância horizontal entre centros
         distance = abs(self.x - player.x)
         
-        return distance < (obstacle_radius + player_radius)
+        # Verificação mais generosa
+        return distance < (obstacle_hitbox + player_hitbox) / 2
 
 class Road:
     def __init__(self):
@@ -245,7 +246,156 @@ class Road:
         else:
             surface.fill(BLACK)
 
+class Button:
+    def __init__(self, x, y, width, height, text, color, hover_color, action=None):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = color
+        self.hover_color = hover_color
+        self.action = action
+        self.is_hovered = False
+        self.font = pygame.font.SysFont('Arial', 32, bold=True)
+        
+    def draw(self, surface):
+        color = self.hover_color if self.is_hovered else self.color
+        pygame.draw.rect(surface, color, self.rect, border_radius=10)
+        pygame.draw.rect(surface, WHITE, self.rect, 2, border_radius=10)
+        
+        text_surface = self.font.render(self.text, True, WHITE)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        surface.blit(text_surface, text_rect)
+        
+    def check_hover(self, pos):
+        self.is_hovered = self.rect.collidepoint(pos)
+        return self.is_hovered
+        
+    def execute_action(self):
+        if self.action:
+            return self.action()
+        return None
+
+def show_main_menu():
+    # Cores personalizadas
+    DARK_BLUE = (10, 20, 40)
+    LIGHT_BLUE = (100, 150, 255)
+    RED = (200, 50, 50)
+    
+    # Efeitos de animação
+    title_y = -50
+    title_target_y = 50
+    title_speed = 2
+    
+    # Criar botões
+    start_button = Button(WIDTH//2 - 100, 250, 200, 50, "INICIAR", DARK_BLUE, LIGHT_BLUE, lambda: "start")
+    quit_button = Button(WIDTH//2 - 100, 320, 200, 50, "SAIR", DARK_BLUE, RED, lambda: "quit")
+    
+    # Carregar imagens de fundo
+    try:
+        bg_image = pygame.image.load("frame1.png").convert()
+        bg_image = pygame.transform.scale(bg_image, (WIDTH, HEIGHT))
+    except:
+        bg_image = None
+    
+    # Efeitos de estrada em movimento
+    road_offset = 0
+    
+    # Texto de título
+    title_font = pygame.font.SysFont('Arial', 72, bold=True)
+    subtitle_font = pygame.font.SysFont('Arial', 24, italic=True)
+    
+    # Efeitos de brilho
+    glow_alpha = 0
+    glow_direction = 1
+    
+    running = True
+    while running:
+        mouse_pos = pygame.mouse.get_pos()
+        
+        # Eventos
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Botão esquerdo
+                    if start_button.check_hover(mouse_pos):
+                        return start_button.execute_action()
+                    elif quit_button.check_hover(mouse_pos):
+                        return quit_button.execute_action()
+        
+        # Atualizações
+        start_button.check_hover(mouse_pos)
+        quit_button.check_hover(mouse_pos)
+        
+        # Animação do título
+        if title_y < title_target_y:
+            title_y += title_speed
+        
+        # Efeito de brilho pulsante
+        glow_alpha += 2 * glow_direction
+        if glow_alpha > 100 or glow_alpha <= 0:
+            glow_direction *= -1
+        
+        # Efeito de estrada em movimento
+        road_offset = (road_offset + 0.5) % WIDTH
+        
+        # Desenhar
+        if bg_image:
+            screen.blit(bg_image, (-road_offset, 0))
+            screen.blit(bg_image, (WIDTH - road_offset, 0))
+        else:
+            screen.fill(DARK_BLUE)
+        
+        # Overlay escuro
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        screen.blit(overlay, (0, 0))
+        
+        # Título com efeito de brilho
+        title_text = title_font.render("ZUI DURUM", True, (255, 255, 255))
+        title_rect = title_text.get_rect(center=(WIDTH//2, title_y))
+        
+        # Efeito de brilho
+        glow_surface = pygame.Surface((title_rect.width + 20, title_rect.height + 20), pygame.SRCALPHA)
+        pygame.draw.rect(glow_surface, (255,255,255,glow_alpha), 
+                        (0, 0, title_rect.width + 20, title_rect.height + 20), 
+                        border_radius=10)
+        screen.blit(glow_surface, (title_rect.x - 10, title_rect.y - 10))
+        
+        screen.blit(title_text, title_rect)
+        
+        # Subtítulo
+        subtitle_text = subtitle_font.render("Não beba e dirija... ou beba e tente sobreviver!", True, WHITE)
+        screen.blit(subtitle_text, (WIDTH//2 - subtitle_text.get_width()//2, title_y + 70))
+        
+        # Botões
+        start_button.draw(screen)
+        quit_button.draw(screen)
+        
+        # Instruções
+        instructions_font = pygame.font.SysFont('Arial', 16)
+        instructions = [
+            "CONTROLES:",
+            "A/← - Mover para esquerda",
+            "D/→ - Mover para direita",
+            "F/ESPAÇO - Beber (cuidado!)"
+        ]
+        
+        for i, line in enumerate(instructions):
+            text = instructions_font.render(line, True, WHITE)
+            screen.blit(text, (20, HEIGHT - 100 + i * 20))
+
+        pygame.display.flip()
+        pygame.time.Clock().tick(FPS)
+
 def main():
+    # Mostrar menu primeiro
+    menu_result = show_main_menu()
+    
+    if menu_result == "quit":
+        pygame.quit()
+        return
+    
+    # Configuração inicial do jogo
     clock = pygame.time.Clock()
     player = Player()
     road = Road()
@@ -271,20 +421,17 @@ def main():
                     score = 0
                     game_over = False
                     current_spawn_rate = INITIAL_SPAWN_RATE
-                # Movimento apenas no KEYDOWN (não no pressionamento contínuo)
                 if not game_over:
                     if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                         player.move_left()
                     if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                         player.move_right()
-                    # Beber com F ou Espaço
                     if event.key == pygame.K_f or event.key == pygame.K_SPACE:
                         player.drink()
         
         if not game_over:
             player.update()
             
-            # Spawn de obstáculos com o fator de escala atual
             obstacle_counter += 1
             if obstacle_counter >= current_spawn_rate:
                 lane = random.randint(0, LANE_COUNT - 1)
@@ -293,7 +440,6 @@ def main():
                 if score % 10 == 0 and current_spawn_rate > MIN_SPAWN_RATE:
                     current_spawn_rate -= 5
             
-            # Atualizar obstáculos
             for obstacle in obstacles[:]:
                 if not obstacle.update(player):
                     obstacles.remove(obstacle)
@@ -306,7 +452,6 @@ def main():
                 elif obstacle.collides_with(player):
                     game_over = True
         
-        # Desenhar
         road.draw(screen, player.world_offset, player.drink_effect_active, 
                  current_time - player.drink_effect_start_time if player.drink_effect_active else 0)
         
@@ -315,22 +460,15 @@ def main():
         
         player.draw(screen)
         
-        # UI
         font = pygame.font.SysFont(None, 36)
-        
-        # Desenhar contador de bebidas
         drink_label = font.render("Bebida:", True, WHITE)
         drink_count = font.render(str(player.drinks), True, WHITE)
-        
-        # Posiciona no canto superior esquerdo
         screen.blit(drink_label, (10, 10))
         screen.blit(drink_count, (10 + drink_label.get_width() + 5, 10))
         
-        # Pontuação abaixo do contador de bebidas
         score_text = font.render(f"Pontuação: {score}", True, WHITE)
         screen.blit(score_text, (10, 50))
         
-        # Mostrar tempo restante do efeito se ativo
         if player.drink_effect_active:
             remaining_time = (DRINK_EFFECT_DURATION - (current_time - player.drink_effect_start_time)) // 1000
             effect_text = font.render(f"Efeito: {remaining_time}s", True, WHITE)
