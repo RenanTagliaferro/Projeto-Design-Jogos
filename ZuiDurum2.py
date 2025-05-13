@@ -12,7 +12,6 @@ WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Direção em Primeira Pessoa")
 
-# Cores para debug
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
@@ -26,9 +25,9 @@ OBSTACLE_MIN_SPEED = 1.5
 OBSTACLE_MAX_SPEED = 3
 PLAYER_HITBOX_HEIGHT = 340
 MOVE_AMOUNT = 100  # Quantidade de movimento lateral
-DRINK_EFFECT_DURATION = 6000  # 6 segundos em milissegundos
+# DRINK_EFFECT_DURATION = 6000  # REMOVA OU COMENTE ESTA LINHA
 DRINK_SCALE_BOOST = 3.0  # Fator de aceleração do crescimento dos carros
-DRUNK_SPEED_BOOST = 1.5  # Fator de aceleração dos obstáculos quando bêbado
+# DRUNK_SPEED_BOOST = 1.5  # REMOVA OU COMENTE ESTA LINHA (não era utilizada diretamente para velocidade do obstáculo)
 MAX_DRUNK_LEVEL = 5
 PHASE_DURATION = 45000  # 45 segundos em milissegundos
 TIME_BOOST_PER_DRINK = 1.2  # Fator de aceleração do tempo por drink
@@ -43,15 +42,8 @@ class Player:
         self.hitbox_y = HEIGHT - PLAYER_HITBOX_HEIGHT
         self.is_moving = False
         self.move_speed = 15
-        self.drinks = 5
-        self.drink_effect_active = False
-        self.drink_effect_start_time = 0
-        self.drink_scale_boost = 1.0
-        self.drunk_level = 0
-        self.drunk_wave_effect = 0
-        self.phase_start_time = 0
-        self.time_multiplier = 1.0  # Fator de aceleração do tempo
-        
+        # Atributos como drinks, drink_effect_active, etc., são inicializados em reset_position()
+
     def reset_position(self):
         self.lane = 1
         self.x = WIDTH // 2
@@ -60,24 +52,24 @@ class Player:
         self.target_offset = 0
         self.drinks = 5
         self.drink_effect_active = False
+        self.drink_effect_start_time = 0 # Usado para a animação da onda desde a última bebida
         self.drink_scale_boost = 1.0
-        self.drunk_level = 0  # Corrige o problema 1 - reset do nível
+        self.drunk_level = 0
         self.drunk_wave_effect = 0
-        self.phase_start_time = pygame.time.get_ticks()
         self.time_multiplier = 1.0
         
     def load_image(self):
         try:
             self.image = pygame.image.load("player.png").convert_alpha()
             self.image = pygame.transform.scale(self.image, (self.width, self.height))
-        except:
-            print("Imagem do jogador não encontrada")
+        except Exception as e:
+            print(f"Imagem do jogador não encontrada ou erro ao carregar: {e}")
             self.image = None
-        
+            
     def move_left(self):
         if self.lane > 0 and not self.is_moving:
             self.lane -= 1
-            self.target_offset += LANE_WIDTH  # Agora move exatamente uma faixa
+            self.target_offset += LANE_WIDTH
             self.is_moving = True
             return True
         return False
@@ -85,7 +77,7 @@ class Player:
     def move_right(self):
         if self.lane < LANE_COUNT - 1 and not self.is_moving:
             self.lane += 1
-            self.target_offset -= LANE_WIDTH  # Agora move exatamente uma faixa
+            self.target_offset -= LANE_WIDTH
             self.is_moving = True
             return True
         return False
@@ -95,108 +87,140 @@ class Player:
         if self.drinks > 0 and self.drunk_level < MAX_DRUNK_LEVEL:
             self.drinks -= 1
             self.drink_effect_active = True
-            self.drink_effect_start_time = current_time
+            self.drink_effect_start_time = current_time # Define/atualiza o início do efeito visual da onda
             self.drunk_level += 1
-            self.time_multiplier *= TIME_BOOST_PER_DRINK  # Acelera o tempo
+            self.time_multiplier *= TIME_BOOST_PER_DRINK # Acelera o tempo
+            # O drink_scale_boost será aplicado em update()
             return True
         return False
         
     def update(self):
         current_time = pygame.time.get_ticks()
         
-        # Atualiza efeitos visuais acumulativos
         if self.drink_effect_active:
-            time_since_drink = (current_time - self.drink_effect_start_time) / 1000
-            self.drunk_wave_effect = self.drunk_level * math.sin(time_since_drink * 3) * 5
+            # Efeito de onda visual
+            if self.drink_effect_start_time > 0: # Garante que o tempo foi setado
+                 time_since_drink = (current_time - self.drink_effect_start_time) / 1000.0
+                 self.drunk_wave_effect = self.drunk_level * math.sin(time_since_drink * 3.0) * 5.0
+            else: # Fallback caso o tempo não tenha sido setado (não deve ocorrer com a lógica atual de drink())
+                 self.drunk_wave_effect = self.drunk_level * math.sin(current_time / 1000.0 * 3.0) * 5.0
             
+            self.drink_scale_boost = DRINK_SCALE_BOOST # Aplica o boost de escala dos obstáculos
+        else:
+            # Reseta os boosts e efeitos visuais quando o efeito de bebida não está ativo
+            self.drink_scale_boost = 1.0
+            self.drunk_wave_effect = 0
+            # self.drink_effect_start_time é resetado em reset_position ou quando o efeito termina (fase/game over)
+            
+        # Lógica de movimento da câmera/mundo
         if abs(self.world_offset - self.target_offset) > 1:
             self.world_offset += (self.target_offset - self.world_offset) * 0.2
         else:
+            self.world_offset = self.target_offset # Garante que chegue ao valor exato para evitar micro-movimentos
             self.is_moving = False
-        
+            
     def draw(self, surface):
         if self.image:
-            if self.drink_effect_active:
+            # Aplica efeitos visuais de embriaguez se o efeito estiver ativo e houver algum nível de embriaguez
+            if self.drink_effect_active and self.drunk_level > 0:
                 drunk_surface = self.image.copy()
+                # Cria uma superfície temporária para aplicar os efeitos de distorção e desfoque
                 temp_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
                 
-                # Efeito acumulativo baseado no drunk_level
-                for y in range(0, self.height, 5):
-                    # Combina múltiplas ondas com intensidade progressiva
-                    offset_x = (10 + self.drunk_level * 3) * math.sin(
-                        y * 0.05 + pygame.time.get_ticks() * 0.005 * self.drunk_level
+                # Efeito de onda na imagem do jogador
+                for y_slice in range(0, self.height, 5):
+                    # Calcula o deslocamento horizontal para a onda
+                    # Combina uma onda baseada no tempo global e nível de embriaguez com a onda específica da bebida
+                    offset_x_wave = (10 + self.drunk_level * 3) * math.sin(
+                        y_slice * 0.05 + pygame.time.get_ticks() * 0.005 * self.drunk_level
                     )
-                    offset_x += self.drunk_wave_effect
-                    temp_surface.blit(drunk_surface, (offset_x, y), (0, y, self.width, 5))
+                    offset_x = offset_x_wave + self.drunk_wave_effect # Adiciona a onda calculada em update
+                    
+                    # Desenha uma fatia da imagem original deslocada na superfície temporária
+                    temp_surface.blit(drunk_surface, (offset_x, y_slice), (0, y_slice, self.width, 5))
                 
-                # Desfoque progressivo
-                alpha = 200 - self.drunk_level * 20
-                temp_surface.fill((255, 255, 255, alpha), None, pygame.BLEND_RGBA_MULT)
+                # Aplica um desfoque/alpha progressivo baseado no nível de embriaguez
+                alpha_blur = max(0, 200 - self.drunk_level * 20) # Garante que alpha não seja negativo
+                temp_surface.fill((255, 255, 255, alpha_blur), None, pygame.BLEND_RGBA_MULT)
+                
                 surface.blit(temp_surface, (0, 0))
             else:
+                # Desenha a imagem normal do jogador se não houver efeito de bebida ativo
                 surface.blit(self.image, (0, 0))
 
 class Obstacle:
-    def __init__(self, lane, world_offset=0, scale_boost=1.0):
+    def __init__(self, lane, world_offset=0): # Removido scale_boost como parâmetro
         self.lane = lane
         self.base_x = (WIDTH // 2) + (lane - 1) * (LANE_WIDTH)  
         self.x = self.base_x + world_offset
         self.y = 200  # Spawn mais acima
-        self.base_speed = random.uniform(2.0, 3.0)  # Velocidade base
+        self.base_speed = random.uniform(2.0, 3.0)
         self.base_width = 100
         self.base_height = 180
         self.scale = 0.1  # Tamanho inicial bem pequeno
         self.image = None
         self.load_image()
-        self.should_render = True
-        self.max_scale = 5.5  # Aumentei o tamanho máximo
+        self.should_render = True # Controla se o obstáculo deve ser desenhado (otimização)
+        self.max_scale = 5.5
         self.min_speed = 0.2  # Velocidade mínima (nunca zera)
-        self.scale_boost = scale_boost  # Fator de aceleração do crescimento
+        # self.scale_boost não é mais um atributo do obstáculo; usa player.drink_scale_boost diretamente
         
     def load_image(self):
         try:
             self.image = pygame.image.load("carro-vindo.png").convert_alpha()
-        except:
-            print("Imagem de obstáculo não encontrada")
+        except Exception as e:
+            print(f"Imagem de obstáculo não encontrada ou erro ao carregar: {e}")
             self.image = None
+            
+    def update(self, player): # O jogador é passado para acessar seus atributos (drunk_level, drink_scale_boost)
+        self.x = self.base_x + player.world_offset # Atualiza a posição x baseada no movimento do mundo do jogador
+        self.should_render = abs(self.lane - player.lane) <= 1 # Otimização: só renderiza se próximo ao jogador
+
+        # Calcula o progresso do obstáculo na tela para ajustar velocidade e escala
+        progress = min(1.0, (self.y + 400) / (HEIGHT + 400)) # Normaliza entre 0 e 1
+
+        # Velocidade aumenta com o nível de embriaguez do jogador
+        # O código original tinha (player.drunk_level * 2), que é um aumento muito grande.
+        # Se desejar um aumento mais suave (ex: 20% por nível), use player.drunk_level * 0.2
+        # Mantendo o valor original do código fornecido:
+        speed_multiplier = 1 + (player.drunk_level * 2) 
         
-    def update(self, player):
-        self.x = self.base_x + player.world_offset
-        self.should_render = abs(self.lane - player.lane) <= 1
-
-        progress = min(1.0, (self.y + 400) / (HEIGHT + 400))
-
-        # Velocidade base com aceleração proporcional ao nível de embriaguez
-        speed_multiplier = 1 + (player.drunk_level * 2)  # 20% mais rápido por nível
+        # A velocidade do obstáculo também varia com sua progressão na tela (efeito de perspectiva)
         current_speed = self.base_speed * (
             self.min_speed + (1 - progress)**2 * (1 - self.min_speed)
         ) * speed_multiplier
         
         self.y += current_speed
 
-        # Escala com boost progressivo
-        scale_increase = (0.01 + (0.03 * progress)) * player.drink_scale_boost
-        self.scale = min(self.max_scale, self.scale + scale_increase)
+        # A escala do obstáculo aumenta com base no progresso e no drink_scale_boost do jogador
+        # Usa player.drink_scale_boost diretamente do objeto player
+        scale_increase_rate = 0.01 + (0.03 * progress) # Taxa base de aumento da escala
+        effective_scale_increase = scale_increase_rate * player.drink_scale_boost # Aplica o boost
+        self.scale = min(self.max_scale, self.scale + effective_scale_increase)
 
+        # Retorna False se o obstáculo atingiu a escala máxima (para ser removido)
         if self.scale >= self.max_scale:
             return False
         return True
-
-        
+            
     def draw(self, surface):
-        if not self.should_render:
+        if not self.should_render or not self.image: # Não desenha se não for necessário ou não houver imagem
             return
             
         current_width = int(self.base_width * self.scale)
         current_height = int(self.base_height * self.scale)
         
-        if self.image:
-            scaled_img = pygame.transform.scale(self.image, (current_width, current_height))
-            img_rect = scaled_img.get_rect(center=(self.x, self.y))
-            surface.blit(scaled_img, img_rect)
+        # Evita erro se a escala for muito pequena ou negativa
+        if current_width <= 0 or current_height <= 0:
+            return
+
+        scaled_img = pygame.transform.scale(self.image, (current_width, current_height))
+        img_rect = scaled_img.get_rect(center=(self.x, self.y))
+        surface.blit(scaled_img, img_rect)
     
     def is_off_screen(self):
-        return self.y > 600  # Remove quando passar do novo limite
+        # Remove o obstáculo se ele saiu da parte inferior da tela
+        return self.y > HEIGHT + (self.base_height * self.scale / 2) # Ajustado para considerar a altura do obstáculo
     
     def collides_with(self, player):
         # Corrige problema 3 - nova lógica de colisão
@@ -305,7 +329,7 @@ def show_main_menu():
     title_speed = 2
     
     # Criar botões
-    start_button = Button(WIDTH//2 - 100, 250, 200, 50, "INICIAR", DARK_BLUE, LIGHT_BLUE, lambda: "start")
+    start_button = Button(WIDTH//2 - 100, 250, 200, 50, "INICIAR", DARK_BLUE, LIGHT_BLUE, lambda: "game_start")
     quit_button = Button(WIDTH//2 - 100, 320, 200, 50, "SAIR", DARK_BLUE, RED, lambda: "quit")
     
     # Carregar imagens de fundo
@@ -327,7 +351,11 @@ def show_main_menu():
     glow_direction = 1
     
     running = True
+
+    menu_start_time = pygame.time.get_ticks()
+    
     while running:
+        current_time = pygame.time.get_ticks() - menu_start_time
         mouse_pos = pygame.mouse.get_pos()
         
         # Eventos
@@ -407,12 +435,11 @@ def show_main_menu():
         pygame.time.Clock().tick(FPS)
 
 def main():
-    # Mostrar menu primeiro
     menu_result = show_main_menu()
     
     if menu_result == "quit":
         pygame.quit()
-        return
+        sys.exit() # Usar sys.exit() para terminar o programa completamente
     
     # Configuração inicial do jogo
     clock = pygame.time.Clock()
@@ -425,94 +452,166 @@ def main():
     current_spawn_rate = INITIAL_SPAWN_RATE
     
     phase_complete = False
+    game_started = False
+    phase_start_time = 0
+    
     running = True
     while running:
         current_time = pygame.time.get_ticks()
-        elapsed_time = (current_time - player.phase_start_time) * player.time_multiplier
-        remaining_time = max(0, PHASE_DURATION - elapsed_time)
-            
-        # Verifica se completou a fase
-        if not phase_complete and remaining_time <= 0:
-            phase_complete = True
         
+        if game_started:
+            # Calcula o tempo decorrido e restante na fase, considerando o multiplicador de tempo do jogador
+            elapsed_time = (current_time - phase_start_time) * player.time_multiplier
+            remaining_time = max(0, PHASE_DURATION - elapsed_time)
+            
+            # Verifica se a fase foi completada
+            if not phase_complete and remaining_time <= 0:
+                phase_complete = True
+                player.drink_effect_active = False  # Desativa o efeito de bebida ao final da fase
+                player.time_multiplier = 1.0      # Reseta o multiplicador de tempo para a próxima fase
+                # O drunk_level não é resetado aqui, persiste para a próxima fase (se houver)
+                # Outros efeitos (wave, scale_boost) serão resetados em player.update()
+        else:
+            remaining_time = PHASE_DURATION # Tempo total da fase antes de começar
+            
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                if event.key == pygame.K_r and game_over:
-                    player.reset_position()
+                
+                # Lógica para reiniciar o jogo após Game Over
+                if game_over and event.key == pygame.K_r:
+                    player.reset_position() # Reseta todos os atributos do jogador (incluindo efeitos de bebida, drunk_level)
                     obstacles = []
-                    score = 0
+                    score = 0 # Reinicia a pontuação
                     game_over = False
                     current_spawn_rate = INITIAL_SPAWN_RATE
-                if not game_over:
+                    phase_complete = False # Garante que não esteja em estado de fase completa
+                    game_started = True    # O jogo reinicia imediatamente
+                    phase_start_time = current_time # Define o novo tempo de início da fase
+                
+                # Lógica para continuar para a próxima fase (se implementado)
+                elif phase_complete and event.key == pygame.K_r:
+                    # Prepara para uma nova fase
+                    obstacles = [] # Limpa obstáculos da fase anterior
+                    # score pode continuar ou ser resetado por fase, atualmente continua
+                    current_spawn_rate = INITIAL_SPAWN_RATE # Pode ajustar a dificuldade aqui
+                    phase_complete = False
+                    game_started = True # Continua o jogo
+                    phase_start_time = current_time # Define o tempo de início da nova fase
+                    # player.reset_position() NÃO é chamado aqui para manter o drunk_level
+                    # player.drink_effect_active já é False e time_multiplier é 1.0
+                
+                # Lógica para iniciar o jogo a partir do menu ou estado inicial
+                elif not game_started and menu_result == "game_start":
+                    game_started = True
+                    phase_start_time = current_time
+                    # Processa a primeira ação do jogador que iniciou o jogo
+                    if not game_over and not phase_complete: # Garante que o jogo pode receber input
+                        if event.key == pygame.K_a or event.key == pygame.K_LEFT:
+                            player.move_left()
+                        elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:
+                            player.move_right()
+                        elif event.key == pygame.K_f or event.key == pygame.K_SPACE:
+                            player.drink()
+                
+                # Processa input do jogador durante o jogo
+                elif game_started and not game_over and not phase_complete:
                     if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                         player.move_left()
-                    if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
+                    elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                         player.move_right()
-                    if event.key == pygame.K_f or event.key == pygame.K_SPACE:
+                    elif event.key == pygame.K_f or event.key == pygame.K_SPACE:
                         player.drink()
-        
-        if not game_over:
-            player.update()
+                        
+        # Lógica de atualização do jogo (só roda se o jogo começou, não está em game over e a fase não terminou)
+        if game_started and not game_over and not phase_complete:
+            player.update() # Atualiza o estado do jogador e seus efeitos
             
+            # Geração de obstáculos
             obstacle_counter += 1
             if obstacle_counter >= current_spawn_rate:
                 lane = random.randint(0, LANE_COUNT - 1)
-                obstacles.append(Obstacle(lane, player.world_offset, player.drink_scale_boost))
+                # O scale_boost é acessado pelo obstáculo diretamente do player em seu update
+                obstacles.append(Obstacle(lane, player.world_offset))
                 obstacle_counter = 0
-                if score % 10 == 0 and current_spawn_rate > MIN_SPAWN_RATE:
+                # Aumenta a taxa de spawn baseada na pontuação (ou outro critério)
+                if score > 0 and score % 10 == 0 and current_spawn_rate > MIN_SPAWN_RATE:
                     current_spawn_rate -= 5
             
-            for obstacle in obstacles[:]:
-                if not obstacle.update(player):
-                    obstacles.remove(obstacle)
-                    score += 1
-                    continue
-                if obstacle.is_off_screen():
-                    obstacles.remove(obstacle)
-                    score += 1
+            # Atualiza e verifica colisões dos obstáculos
+            for i in range(len(obstacles) - 1, -1, -1): # Itera de trás para frente para remoção segura
+                obstacle = obstacles[i]
+                if not obstacle.update(player): # Se update retorna False (ex: max_scale atingido)
+                    obstacles.pop(i)
+                    score += 1 # Pontua por desviar/sobreviver ao obstáculo
+                elif obstacle.is_off_screen():
+                    obstacles.pop(i)
+                    score += 1 # Pontua por desviar/sobreviver ao obstáculo
                 elif obstacle.collides_with(player):
                     game_over = True
+                    player.drink_effect_active = False # Desativa efeitos de bebida no game over
+                    player.time_multiplier = 1.0     # Reseta multiplicador de tempo
+                    # player.update() no próximo ciclo (se houver antes do display de game over)
+                    # ou player.reset_position() no reinício cuidará de zerar os efeitos visuais.
+                    break # Sai do loop de obstáculos após a primeira colisão
         
-        road.draw(screen, player.world_offset, 
-          player.drink_effect_active,
-          current_time - player.drink_effect_start_time if player.drink_effect_active else 0,
-          player.drunk_level)  # Passa o nível de embriaguez
+        # Renderização
+        screen.fill(BLACK) # Limpa a tela com uma cor base (opcional, se a estrada cobrir tudo)
 
+        road.draw(screen, player.world_offset, 
+                  player.drink_effect_active, # Passa se o efeito de bebida está ativo
+                  # Tempo para animação da estrada (usa o tempo desde a última bebida para sincronia)
+                  current_time - player.drink_effect_start_time if player.drink_effect_active and player.drink_effect_start_time > 0 else 0,
+                  player.drunk_level)
+        
         for obstacle in obstacles:
             obstacle.draw(screen)
         
-        player.draw(screen)
-
-        # UI - Adicione o contador de tempo
-        font = pygame.font.SysFont(None, 36)
-
-        # Contador de tempo (formato MM:SS)
-        time_text = font.render(f"Tempo: {int(remaining_time/1000)//60:02d}:{int(remaining_time/1000)%60:02d}", True, WHITE)
-        screen.blit(time_text, (WIDTH - time_text.get_width() - 10, 50))
+        player.draw(screen) # Desenha o jogador com seus efeitos
         
-        font = pygame.font.SysFont(None, 36)
-        drink_label = font.render("Bebida:", True, WHITE)
-        drink_count = font.render(str(player.drinks), True, WHITE)
-        screen.blit(drink_label, (10, 10))
-        screen.blit(drink_count, (10 + drink_label.get_width() + 5, 10))
+        # Interface do Usuário (UI)
+        font = pygame.font.SysFont(None, 36) # Fonte padrão para UI
         
-        score_text = font.render(f"Pontuação: {score}", True, WHITE)
-        screen.blit(score_text, (10, 50))
+        # Exibe o tempo restante (apenas se o jogo começou)
+        if game_started:
+            time_val_sec = int(remaining_time / 1000)
+            time_minutes = time_val_sec // 60
+            time_seconds = time_val_sec % 60
+            time_text_render = font.render(f"Tempo: {time_minutes:02d}:{time_seconds:02d}", True, WHITE)
+            screen.blit(time_text_render, (WIDTH - time_text_render.get_width() - 10, 50))
+        # Mensagem para iniciar (se o jogo ainda não começou após o menu)
+        elif menu_result == "game_start" and not game_started: 
+            start_prompt_text = font.render("Pressione qualquer tecla para começar", True, WHITE)
+            text_rect = start_prompt_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            screen.blit(start_prompt_text, text_rect)
+            
+        # Exibe a quantidade de bebidas restantes
+        drinks_label_render = font.render("Bebidas:", True, WHITE)
+        drinks_count_render = font.render(str(player.drinks), True, WHITE)
+        screen.blit(drinks_label_render, (10, 10))
+        screen.blit(drinks_count_render, (10 + drinks_label_render.get_width() + 5, 10))
+        
+        # Exibe a pontuação
+        score_render = font.render(f"Pontuação: {score}", True, WHITE)
+        screen.blit(score_render, (10, 50))
 
+        # Mensagem de Fase Completa
         if phase_complete:
-            phase_text = font.render("FASE COMPLETA! Pressione R para continuar", True, WHITE)
-            screen.blit(phase_text, (WIDTH//2 - phase_text.get_width()//2, HEIGHT//2))
+            complete_text_render = font.render("FASE COMPLETA! Pressione R para continuar", True, WHITE)
+            text_rect = complete_text_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            screen.blit(complete_text_render, text_rect)
         
+        # Mensagem de Game Over
         if game_over:
-            game_over_text = font.render("GAME OVER - Pressione R para reiniciar", True, WHITE)
-            screen.blit(game_over_text, (WIDTH//2 - game_over_text.get_width()//2, HEIGHT//2))
-        
-        pygame.display.flip()
-        clock.tick(FPS)
+            game_over_render = font.render("GAME OVER - Pressione R para reiniciar", True, WHITE)
+            text_rect = game_over_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            screen.blit(game_over_render, text_rect)
+            
+        pygame.display.flip() # Atualiza a tela inteira
+        clock.tick(FPS) # Controla a taxa de quadros por segundo
 
 if __name__ == "__main__":
     main()
