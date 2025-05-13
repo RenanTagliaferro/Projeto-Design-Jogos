@@ -25,17 +25,34 @@ OBSTACLE_MIN_SPEED = 1.5
 OBSTACLE_MAX_SPEED = 3
 PLAYER_HITBOX_HEIGHT = 340
 MOVE_AMOUNT = 100  # Quantidade de movimento lateral
-# DRINK_EFFECT_DURATION = 6000  # REMOVA OU COMENTE ESTA LINHA
 DRINK_SCALE_BOOST = 3.0  # Fator de aceleração do crescimento dos carros
-# DRUNK_SPEED_BOOST = 1.5  # REMOVA OU COMENTE ESTA LINHA (não era utilizada diretamente para velocidade do obstáculo)
 MAX_DRUNK_LEVEL = 5
-PHASE_DURATION = 45000  # 45 segundos em milissegundos
+PHASE_DURATION = 5000  # 5 segundos para teste
 TIME_BOOST_PER_DRINK = 1.2  # Fator de aceleração do tempo por drink
+
+# Carregar imagens para a cena de alternância
+try:
+    BACKGROUND_IMAGE_1 = pygame.image.load("background1.jpg").convert()
+    BACKGROUND_IMAGE_1 = pygame.transform.scale(BACKGROUND_IMAGE_1, (WIDTH, HEIGHT))
+except FileNotFoundError:
+    BACKGROUND_IMAGE_1 = pygame.Surface((WIDTH, HEIGHT))
+    BACKGROUND_IMAGE_1.fill((50, 50, 150))
+    print("Erro: 'background1.jpg' não encontrado. Usando cor sólida.") # Changed from .png to .jpg as per definition
+
+try:
+    BACKGROUND_IMAGE_2 = pygame.image.load("background2.jpg").convert()
+    BACKGROUND_IMAGE_2 = pygame.transform.scale(BACKGROUND_IMAGE_2, (WIDTH, HEIGHT))
+except FileNotFoundError:
+    BACKGROUND_IMAGE_2 = pygame.Surface((WIDTH, HEIGHT))
+    BACKGROUND_IMAGE_2.fill((100, 50, 100))
+    print("Erro: 'background2.jpg' não encontrado. Usando cor sólida.") # Changed from .png to .jpg as per definition
+
+BACKGROUND_SWITCH_DELAY = 1000  # 1 segundo
 
 class Player:
     def __init__(self):
         self.reset_position()
-        self.width = WIDTH 
+        self.width = WIDTH
         self.height = HEIGHT
         self.image = None
         self.load_image()
@@ -57,7 +74,7 @@ class Player:
         self.drunk_level = 0
         self.drunk_wave_effect = 0
         self.time_multiplier = 1.0
-        
+
     def load_image(self):
         try:
             self.image = pygame.image.load("player.png").convert_alpha()
@@ -65,7 +82,7 @@ class Player:
         except Exception as e:
             print(f"Imagem do jogador não encontrada ou erro ao carregar: {e}")
             self.image = None
-            
+
     def move_left(self):
         if self.lane > 0 and not self.is_moving:
             self.lane -= 1
@@ -73,7 +90,7 @@ class Player:
             self.is_moving = True
             return True
         return False
-        
+
     def move_right(self):
         if self.lane < LANE_COUNT - 1 and not self.is_moving:
             self.lane += 1
@@ -81,7 +98,7 @@ class Player:
             self.is_moving = True
             return True
         return False
-        
+
     def drink(self):
         current_time = pygame.time.get_ticks()
         if self.drinks > 0 and self.drunk_level < MAX_DRUNK_LEVEL:
@@ -93,32 +110,32 @@ class Player:
             # O drink_scale_boost será aplicado em update()
             return True
         return False
-        
+
     def update(self):
         current_time = pygame.time.get_ticks()
-        
+
         if self.drink_effect_active:
             # Efeito de onda visual
             if self.drink_effect_start_time > 0: # Garante que o tempo foi setado
-                 time_since_drink = (current_time - self.drink_effect_start_time) / 1000.0
-                 self.drunk_wave_effect = self.drunk_level * math.sin(time_since_drink * 3.0) * 5.0
+                time_since_drink = (current_time - self.drink_effect_start_time) / 1000.0
+                self.drunk_wave_effect = self.drunk_level * math.sin(time_since_drink * 3.0) * 5.0
             else: # Fallback caso o tempo não tenha sido setado (não deve ocorrer com a lógica atual de drink())
-                 self.drunk_wave_effect = self.drunk_level * math.sin(current_time / 1000.0 * 3.0) * 5.0
-            
+                self.drunk_wave_effect = self.drunk_level * math.sin(current_time / 1000.0 * 3.0) * 5.0
+
             self.drink_scale_boost = DRINK_SCALE_BOOST # Aplica o boost de escala dos obstáculos
         else:
             # Reseta os boosts e efeitos visuais quando o efeito de bebida não está ativo
             self.drink_scale_boost = 1.0
             self.drunk_wave_effect = 0
             # self.drink_effect_start_time é resetado em reset_position ou quando o efeito termina (fase/game over)
-            
+
         # Lógica de movimento da câmera/mundo
         if abs(self.world_offset - self.target_offset) > 1:
             self.world_offset += (self.target_offset - self.world_offset) * 0.2
         else:
             self.world_offset = self.target_offset # Garante que chegue ao valor exato para evitar micro-movimentos
             self.is_moving = False
-            
+
     def draw(self, surface):
         if self.image:
             # Aplica efeitos visuais de embriaguez se o efeito estiver ativo e houver algum nível de embriaguez
@@ -126,7 +143,7 @@ class Player:
                 drunk_surface = self.image.copy()
                 # Cria uma superfície temporária para aplicar os efeitos de distorção e desfoque
                 temp_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-                
+
                 # Efeito de onda na imagem do jogador
                 for y_slice in range(0, self.height, 5):
                     # Calcula o deslocamento horizontal para a onda
@@ -135,14 +152,14 @@ class Player:
                         y_slice * 0.05 + pygame.time.get_ticks() * 0.005 * self.drunk_level
                     )
                     offset_x = offset_x_wave + self.drunk_wave_effect # Adiciona a onda calculada em update
-                    
+
                     # Desenha uma fatia da imagem original deslocada na superfície temporária
                     temp_surface.blit(drunk_surface, (offset_x, y_slice), (0, y_slice, self.width, 5))
-                
+
                 # Aplica um desfoque/alpha progressivo baseado no nível de embriaguez
                 alpha_blur = max(0, 200 - self.drunk_level * 20) # Garante que alpha não seja negativo
                 temp_surface.fill((255, 255, 255, alpha_blur), None, pygame.BLEND_RGBA_MULT)
-                
+
                 surface.blit(temp_surface, (0, 0))
             else:
                 # Desenha a imagem normal do jogador se não houver efeito de bebida ativo
@@ -151,7 +168,7 @@ class Player:
 class Obstacle:
     def __init__(self, lane, world_offset=0): # Removido scale_boost como parâmetro
         self.lane = lane
-        self.base_x = (WIDTH // 2) + (lane - 1) * (LANE_WIDTH)  
+        self.base_x = (WIDTH // 2) + (lane - 1) * (LANE_WIDTH)
         self.x = self.base_x + world_offset
         self.y = 200  # Spawn mais acima
         self.base_speed = random.uniform(2.0, 3.0)
@@ -164,14 +181,14 @@ class Obstacle:
         self.max_scale = 5.5
         self.min_speed = 0.2  # Velocidade mínima (nunca zera)
         # self.scale_boost não é mais um atributo do obstáculo; usa player.drink_scale_boost diretamente
-        
+
     def load_image(self):
         try:
             self.image = pygame.image.load("carro-vindo.png").convert_alpha()
         except Exception as e:
             print(f"Imagem de obstáculo não encontrada ou erro ao carregar: {e}")
             self.image = None
-            
+
     def update(self, player): # O jogador é passado para acessar seus atributos (drunk_level, drink_scale_boost)
         self.x = self.base_x + player.world_offset # Atualiza a posição x baseada no movimento do mundo do jogador
         self.should_render = abs(self.lane - player.lane) <= 1 # Otimização: só renderiza se próximo ao jogador
@@ -180,74 +197,99 @@ class Obstacle:
         progress = min(1.0, (self.y + 400) / (HEIGHT + 400)) # Normaliza entre 0 e 1
 
         # Velocidade aumenta com o nível de embriaguez do jogador
-        # O código original tinha (player.drunk_level * 2), que é um aumento muito grande.
-        # Se desejar um aumento mais suave (ex: 20% por nível), use player.drunk_level * 0.2
-        # Mantendo o valor original do código fornecido:
-        speed_multiplier = 1 + (player.drunk_level * 0.6) 
-        
+        speed_multiplier = 1 + (player.drunk_level * 0.6)
+
         # A velocidade do obstáculo também varia com sua progressão na tela (efeito de perspectiva)
         current_speed = self.base_speed * (
             self.min_speed + (1 - progress)**2 * (1 - self.min_speed)
         ) * speed_multiplier
-        
+
         self.y += current_speed
 
         # A escala do obstáculo aumenta com base no progresso e no drink_scale_boost do jogador
-        # Usa player.drink_scale_boost diretamente do objeto player
         scale_increase_rate = 0.01 + (0.03 * progress) # Taxa base de aumento da escala
         effective_scale_increase = scale_increase_rate * player.drink_scale_boost # Aplica o boost
         self.scale = min(self.max_scale, self.scale + effective_scale_increase)
 
-        # Retorna False se o obstáculo atingiu a escala máxima (para ser removido)
         if self.scale >= self.max_scale:
             return False
         return True
-            
+
     def draw(self, surface):
         if not self.should_render or not self.image: # Não desenha se não for necessário ou não houver imagem
             return
-            
+
         current_width = int(self.base_width * self.scale)
         current_height = int(self.base_height * self.scale)
-        
-        # Evita erro se a escala for muito pequena ou negativa
+
         if current_width <= 0 or current_height <= 0:
             return
 
         scaled_img = pygame.transform.scale(self.image, (current_width, current_height))
         img_rect = scaled_img.get_rect(center=(self.x, self.y))
         surface.blit(scaled_img, img_rect)
-    
+
     def is_off_screen(self):
-        # Remove o obstáculo se ele saiu da parte inferior da tela
-        return self.y > HEIGHT + (self.base_height * self.scale / 2) # Ajustado para considerar a altura do obstáculo
-    
+        return self.y > HEIGHT + (self.base_height * self.scale / 2)
+
     def collides_with(self, player):
-        # Corrige problema 3 - nova lógica de colisão
         if self.lane != player.lane:
             return False
-            
-        # Verifica se o obstáculo ultrapassou a linha y=450
+
         obstacle_bottom = self.y + (self.base_height * self.scale) / 2
-        if obstacle_bottom < 750:  # 450 é a posição Y fixa da hitbox do jogador
+        if obstacle_bottom < 750:
             return False
-            
-        # Calcula colisão apenas na horizontal
+
         obstacle_width = self.base_width * self.scale
-        player_width = LANE_WIDTH * 0.8  # Largura da hitbox do jogador
-        
+        player_width = LANE_WIDTH * 0.8
+
         obstacle_left = self.x - obstacle_width/2
         obstacle_right = self.x + obstacle_width/2
-        player_left = player.x - player_width/2
-        player_right = player.x + player_width/2
+        # Correct player collision X based on actual player position, not fixed center
+        player_center_x_on_lane = (WIDTH // 2) + (player.lane -1) * LANE_WIDTH + player.world_offset
+        player_game_left = player_center_x_on_lane - player_width / 2
+        player_game_right = player_center_x_on_lane + player_width / 2
         
-        return (obstacle_right > player_left and obstacle_left < player_right)
-    
+        # The player's visual representation might be screen-wide, but their "car" is in a lane.
+        # The original player.x is WIDTH // 2, which is screen center.
+        # We need to compare obstacle's lane position against player's lane position.
+        # Since self.x is already world-adjusted, and player.lane gives the logical lane:
+        # The collision should primarily care if they are in the same lane and obstacle is close enough.
+        # The existing horizontal check is fine if player.x was correctly representing the car's center in the world.
+        # However, player.x is fixed at WIDTH // 2. The world_offset handles the camera movement.
+        # The obstacles self.x = self.base_x + player.world_offset correctly positions them relative to camera.
+        # Player's actual position for collision is effectively fixed at the center of their current lane
+        # *relative to the screen center if world_offset was 0*.
+        # The current logic already simplifies this: if self.lane == player.lane, then they are aligned.
+        # The horizontal check below is then a sanity check for width overlap.
+
+        # Re-evaluating player_left and player_right for clarity for the hitbox.
+        # The player is always "centered" on the screen from their perspective.
+        # The important part is that they are in the same lane.
+        # The hitbox depth (y-axis) and lane alignment are primary.
+        # If they are in the same lane, and the obstacle y is deep enough,
+        # we assume a hit if the obstacle is wide enough to typically fill the lane at that depth.
+        # The current obstacle_left/right vs player_left/right is essentially checking if the
+        # obstacle's visual representation overlaps the player's designated lane space horizontally.
+        # player_left = (WIDTH // 2) - player_width / 2
+        # player_right = (WIDTH // 2) + player_width / 2
+        # This assumes the player is always visually in the center lane of the screen.
+        # This is effectively true from the player's first-person view.
+        
+        # The provided `collides_with` logic uses `player.x` which is `WIDTH // 2`.
+        # This is consistent with the player always being at the center of the view.
+        # The `player.lane` check ensures they are in the same logical path.
+        player_visual_left = (WIDTH // 2) - player_width / 2
+        player_visual_right = (WIDTH // 2) + player_width / 2
+
+        return (obstacle_right > player_visual_left and obstacle_left < player_visual_right)
+
+
 class Road:
     def __init__(self):
         self.image = None
         self.load_image()
-        
+
     def load_image(self):
         try:
             self.image = pygame.image.load("frame1.png").convert()
@@ -255,32 +297,32 @@ class Road:
         except:
             print("Imagem da estrada não encontrada")
             self.image = None
-        
+
     def draw(self, surface, world_offset, drunk_effect=False, effect_time=0, drunk_level=0):
         if self.image:
             if drunk_effect and drunk_level > 0:
                 drunk_surface = self.image.copy()
                 temp_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-                
-                # Efeito acumulativo baseado no drunk_level (Corrige problema 2)
-                wave_intensity = 5 + drunk_level * 2  # Intensidade aumenta com o nível
+
+                wave_intensity = 5 + drunk_level * 2
                 wave_speed = 0.005 + drunk_level * 0.0015
-                
+
                 for y in range(0, HEIGHT, 5):
                     offset_x = wave_intensity * math.sin(y * 0.02 + effect_time * wave_speed)
                     temp_surface.blit(drunk_surface, (world_offset + offset_x, y), (0, y, WIDTH, 5))
-                
-                # Desfoque progressivo
+                    # Draw for seamless wrapping with effect
+                    if world_offset + offset_x > 0 :
+                        temp_surface.blit(drunk_surface, (world_offset + offset_x - WIDTH, y), (0, y, WIDTH, 5))
+                    elif world_offset + offset_x < 0:
+                         temp_surface.blit(drunk_surface, (world_offset + offset_x + WIDTH, y), (0, y, WIDTH, 5))
+
+
                 blur_alpha = 200 - min(150, drunk_level * 30)
                 temp_surface.fill((200, 200, 255, blur_alpha), None, pygame.BLEND_RGBA_MULT)
-                
-                surface.blit(temp_surface, (0, 0))
-                if world_offset > 0:
-                    surface.blit(temp_surface, (world_offset - WIDTH, 0))
-                elif world_offset < 0:
-                    surface.blit(temp_surface, (world_offset + WIDTH, 0))
+
+                surface.blit(temp_surface, (0,0)) # The temp_surface already handles the offset internally for drawing slices
+
             else:
-                # Desenho normal sem efeitos
                 surface.blit(self.image, (world_offset, 0))
                 if world_offset > 0:
                     surface.blit(self.image, (world_offset - WIDTH, 0))
@@ -298,127 +340,86 @@ class Button:
         self.action = action
         self.is_hovered = False
         self.font = pygame.font.SysFont('Arial', 32, bold=True)
-        
+
     def draw(self, surface):
         color = self.hover_color if self.is_hovered else self.color
         pygame.draw.rect(surface, color, self.rect, border_radius=10)
         pygame.draw.rect(surface, WHITE, self.rect, 2, border_radius=10)
-        
+
         text_surface = self.font.render(self.text, True, WHITE)
         text_rect = text_surface.get_rect(center=self.rect.center)
         surface.blit(text_surface, text_rect)
-        
+
     def check_hover(self, pos):
         self.is_hovered = self.rect.collidepoint(pos)
         return self.is_hovered
-        
+
     def execute_action(self):
         if self.action:
             return self.action()
         return None
 
 def show_main_menu():
-    # Cores personalizadas
     DARK_BLUE = (10, 20, 40)
     LIGHT_BLUE = (100, 150, 255)
     RED = (200, 50, 50)
-    
-    # Efeitos de animação
     title_y = -50
     title_target_y = 50
     title_speed = 2
-    
-    # Criar botões
     start_button = Button(WIDTH//2 - 100, 250, 200, 50, "INICIAR", DARK_BLUE, LIGHT_BLUE, lambda: "game_start")
     quit_button = Button(WIDTH//2 - 100, 320, 200, 50, "SAIR", DARK_BLUE, RED, lambda: "quit")
-    
-    # Carregar imagens de fundo
     try:
-        bg_image = pygame.image.load("frame1.png").convert()
+        bg_image = pygame.image.load("frame1.png").convert() # Assuming menu uses frame1.png
         bg_image = pygame.transform.scale(bg_image, (WIDTH, HEIGHT))
     except:
         bg_image = None
-    
-    # Efeitos de estrada em movimento
     road_offset = 0
-    
-    # Texto de título
     title_font = pygame.font.SysFont('Arial', 72, bold=True)
     subtitle_font = pygame.font.SysFont('Arial', 24, italic=True)
-    
-    # Efeitos de brilho
     glow_alpha = 0
     glow_direction = 1
-    
     running = True
-
     menu_start_time = pygame.time.get_ticks()
-    
+
     while running:
-        current_time = pygame.time.get_ticks() - menu_start_time
         mouse_pos = pygame.mouse.get_pos()
-        
-        # Eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Botão esquerdo
+                if event.button == 1:
                     if start_button.check_hover(mouse_pos):
                         return start_button.execute_action()
                     elif quit_button.check_hover(mouse_pos):
                         return quit_button.execute_action()
-        
-        # Atualizações
         start_button.check_hover(mouse_pos)
         quit_button.check_hover(mouse_pos)
-        
-        # Animação do título
         if title_y < title_target_y:
             title_y += title_speed
-        
-        # Efeito de brilho pulsante
         glow_alpha += 2 * glow_direction
         if glow_alpha > 100 or glow_alpha <= 0:
             glow_direction *= -1
-        
-        # Efeito de estrada em movimento
         road_offset = (road_offset + 0.5) % WIDTH
-        
-        # Desenhar
         if bg_image:
             screen.blit(bg_image, (-road_offset, 0))
             screen.blit(bg_image, (WIDTH - road_offset, 0))
         else:
             screen.fill(DARK_BLUE)
-        
-        # Overlay escuro
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))
         screen.blit(overlay, (0, 0))
-        
-        # Título com efeito de brilho
         title_text = title_font.render("ZUI DURUM", True, (255, 255, 255))
         title_rect = title_text.get_rect(center=(WIDTH//2, title_y))
-        
-        # Efeito de brilho
         glow_surface = pygame.Surface((title_rect.width + 20, title_rect.height + 20), pygame.SRCALPHA)
-        pygame.draw.rect(glow_surface, (255,255,255,glow_alpha), 
-                        (0, 0, title_rect.width + 20, title_rect.height + 20), 
-                        border_radius=10)
+        pygame.draw.rect(glow_surface, (255,255,255,glow_alpha),
+                         (0, 0, title_rect.width + 20, title_rect.height + 20),
+                         border_radius=10)
         screen.blit(glow_surface, (title_rect.x - 10, title_rect.y - 10))
-        
         screen.blit(title_text, title_rect)
-        
-        # Subtítulo
         subtitle_text = subtitle_font.render("Não beba e dirija... ou beba e tente sobreviver!", True, WHITE)
         screen.blit(subtitle_text, (WIDTH//2 - subtitle_text.get_width()//2, title_y + 70))
-        
-        # Botões
         start_button.draw(screen)
         quit_button.draw(screen)
-        
-        # Instruções
         instructions_font = pygame.font.SysFont('Arial', 16)
         instructions = [
             "CONTROLES:",
@@ -426,21 +427,52 @@ def show_main_menu():
             "D/→ - Mover para direita",
             "F/ESPAÇO - Beber"
         ]
-        
         for i, line in enumerate(instructions):
             text = instructions_font.render(line, True, WHITE)
             screen.blit(text, (20, HEIGHT - 100 + i * 20))
-
         pygame.display.flip()
         pygame.time.Clock().tick(FPS)
 
-def main():
-    menu_result = show_main_menu()
+# MODIFIED FUNCTION: Renamed and adapted to only draw the scene
+def draw_phase_complete_alternating_scene():
+    global current_background, last_background_switch_time # These are module-level globals
+    current_time_ticks = pygame.time.get_ticks()
+
+    if current_time_ticks - last_background_switch_time > BACKGROUND_SWITCH_DELAY:
+        current_background = BACKGROUND_IMAGE_2 if current_background == BACKGROUND_IMAGE_1 else BACKGROUND_IMAGE_1
+        last_background_switch_time = current_time_ticks
+
+    screen.blit(current_background, (0, 0))
+
+    # Text for the alternating scene
+    font_big = pygame.font.SysFont('Arial', 48, bold=True)
+    text_surface_main = font_big.render("FASE CONCLUÍDA!", True, WHITE)
+    text_rect_main = text_surface_main.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 30))
     
+    # Simple shadow for text
+    shadow_surface_main = font_big.render("FASE CONCLUÍDA!", True, BLACK)
+    screen.blit(shadow_surface_main, (text_rect_main.x + 3, text_rect_main.y + 3))
+    screen.blit(text_surface_main, text_rect_main)
+
+
+    font_small = pygame.font.SysFont('Arial', 28, bold=True)
+    text_surface_prompt = font_small.render("Pressione R para avançar...", True, WHITE)
+    text_rect_prompt = text_surface_prompt.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 40))
+    
+    shadow_surface_prompt = font_small.render("Pressione R para avançar...", True, BLACK)
+    screen.blit(shadow_surface_prompt, (text_rect_prompt.x + 2, text_rect_prompt.y + 2))
+    screen.blit(text_surface_prompt, text_rect_prompt)
+
+
+def main():
+    global current_background, last_background_switch_time, game_started # game_started was already global effectively
+
+    menu_result = show_main_menu()
+
     if menu_result == "quit":
         pygame.quit()
         sys.exit()
-    
+
     clock = pygame.time.Clock()
     player = Player()
     road = Road()
@@ -449,104 +481,105 @@ def main():
     score = 0
     game_over = False
     current_spawn_rate = INITIAL_SPAWN_RATE
-    
-    phase_complete = False
-    game_started = False
-    
-    # Novas variáveis para o sistema de contagem de tempo corrigido
-    effective_elapsed_time = 0.0  # Tempo total "efetivo" decorrido na fase (em milissegundos)
-    last_frame_ticks = 0          # Ticks do Pygame no último quadro, para calcular o delta
 
-    remaining_time = PHASE_DURATION  # Inicializa com a duração total da fase
-    
+    phase_complete = False
+    game_started = False # This will be set true once the player starts the game after menu
+
+    # --- NEW STATE VARIABLE ---
+    in_alternating_scene = False
+
+    effective_elapsed_time = 0.0
+    last_frame_ticks = 0
+    remaining_time = PHASE_DURATION
+
+    # Initial values for alternating background scene (already global)
+    current_background = BACKGROUND_IMAGE_1
+    last_background_switch_time = pygame.time.get_ticks()
+
     running = True
     while running:
         current_frame_ticks = pygame.time.get_ticks()
 
-        # Inicializa last_frame_ticks no primeiro quadro ou após um reset de jogo/fase
-        if last_frame_ticks == 0: 
+        if last_frame_ticks == 0:
             last_frame_ticks = current_frame_ticks
 
-        # Calcula o tempo real (em milissegundos) que passou desde o último quadro
         delta_ticks = current_frame_ticks - last_frame_ticks
-        last_frame_ticks = current_frame_ticks # Atualiza para o próximo quadro
+        last_frame_ticks = current_frame_ticks
         
-        if game_started and not game_over and not phase_complete:
-            # O tempo da fase progride
-            # Aplica o multiplicador de tempo do jogador ao delta_ticks deste quadro
+        # Handle time and phase completion
+        if game_started and not game_over and not phase_complete and not in_alternating_scene:
             effective_delta_ticks = delta_ticks * player.time_multiplier
-            # Acumula o tempo efetivo decorrido
             effective_elapsed_time += effective_delta_ticks
-            
             remaining_time = max(0, PHASE_DURATION - effective_elapsed_time)
             
             if remaining_time <= 0:
                 phase_complete = True
                 player.drink_effect_active = False
-                player.time_multiplier = 1.0 # Reseta o multiplicador para a próxima fase ou reinício
+                player.time_multiplier = 1.0
+                in_alternating_scene = True # <<< TRANSITION TO ALTERNATING SCENE
+                last_background_switch_time = pygame.time.get_ticks() # Reset timer for this scene
         elif not game_started:
-            # Se o jogo não começou, reseta o tempo
             remaining_time = PHASE_DURATION
             effective_elapsed_time = 0.0
-            # last_frame_ticks será atualizado para current_frame_ticks, o que é bom
-            # para evitar um delta grande quando o jogo começar de fato.
-        # Se game_over ou phase_complete, effective_elapsed_time não é incrementado,
-        # então remaining_time mantém seu valor, efetivamente "congelando" o tempo.
-            
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+
+                if in_alternating_scene:
+                    if event.key == pygame.K_r:
+                        in_alternating_scene = False
+                        # Now, phase_complete is still True. The game will fall through
+                        # to display "FASE COMPLETA! Pressione R para continuar"
+                        # and wait for another 'R' press handled by the block below.
                 
-                if game_over and event.key == pygame.K_r:
-                    player.reset_position() # player.time_multiplier é resetado aqui
+                elif game_over and event.key == pygame.K_r:
+                    player.reset_position()
                     obstacles = []
                     score = 0
                     game_over = False
                     current_spawn_rate = INITIAL_SPAWN_RATE
                     phase_complete = False
-                    game_started = True
-                    
-                    effective_elapsed_time = 0.0 # Reseta o tempo acumulado
-                    last_frame_ticks = pygame.time.get_ticks() # Sincroniza para o reinício
+                    game_started = True 
+                    in_alternating_scene = False 
+
+                    effective_elapsed_time = 0.0
+                    last_frame_ticks = pygame.time.get_ticks()
                     remaining_time = PHASE_DURATION
                 
-                elif phase_complete and event.key == pygame.K_r:
+                elif phase_complete and event.key == pygame.K_r: # This is for AFTER alternating scene
                     obstacles = []
                     current_spawn_rate = INITIAL_SPAWN_RATE
                     phase_complete = False
-                    game_started = True
-                    # player.time_multiplier já foi resetado quando phase_complete tornou-se True
+                    # player state (drinks, drunk_level) persists to next phase
+                    # player.time_multiplier was already reset.
                     
-                    effective_elapsed_time = 0.0 # Reseta para a nova fase
-                    last_frame_ticks = pygame.time.get_ticks() # Sincroniza
+                    effective_elapsed_time = 0.0
+                    last_frame_ticks = pygame.time.get_ticks()
                     remaining_time = PHASE_DURATION
                 
                 elif not game_started and menu_result == "game_start":
+                    # Any key press starts the game if menu was passed
                     game_started = True
-                    effective_elapsed_time = 0.0 # Começa a contagem
-                    last_frame_ticks = pygame.time.get_ticks() # Sincroniza
+                    effective_elapsed_time = 0.0
+                    last_frame_ticks = pygame.time.get_ticks()
                     remaining_time = PHASE_DURATION
-                    if not game_over and not phase_complete:
-                        if event.key == pygame.K_a or event.key == pygame.K_LEFT:
-                            player.move_left()
-                        elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:
-                            player.move_right()
-                        elif event.key == pygame.K_f or event.key == pygame.K_SPACE:
-                            player.drink() # player.time_multiplier é alterado aqui
-                
-                elif game_started and not game_over and not phase_complete:
+                    # Game controls will be handled by the next block on subsequent events
+
+                elif game_started and not game_over and not phase_complete and not in_alternating_scene:
+                    # Regular gameplay input
                     if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                         player.move_left()
                     elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                         player.move_right()
                     elif event.key == pygame.K_f or event.key == pygame.K_SPACE:
-                        player.drink() # player.time_multiplier é alterado aqui
-                                       # O efeito no tempo será aplicado no próximo cálculo de effective_delta_ticks
+                        player.drink()
                         
-        if game_started and not game_over and not phase_complete:
+        # Game Logic Update Section
+        if game_started and not game_over and not phase_complete and not in_alternating_scene:
             player.update()
             
             obstacle_counter += 1
@@ -564,57 +597,64 @@ def main():
                     score += 1
                 elif obstacle.is_off_screen():
                     obstacles.pop(i)
-                    score += 1
+                    score += 1 # Count as dodged if it goes off-screen fully scaled
                 elif obstacle.collides_with(player):
                     game_over = True
                     player.drink_effect_active = False
-                    player.time_multiplier = 1.0 # Importante resetar aqui também
+                    player.time_multiplier = 1.0
                     break
         
-        screen.fill(BLACK)
-        road.draw(screen, player.world_offset, 
-                  player.drink_effect_active,
-                  current_frame_ticks - player.drink_effect_start_time if player.drink_effect_active and player.drink_effect_start_time > 0 else 0,
-                  player.drunk_level)
-        
-        for obstacle in obstacles:
-            obstacle.draw(screen)
-        
-        player.draw(screen)
-        
-        font = pygame.font.SysFont(None, 36)
-        
-        if game_started:
-            time_val_sec = int(remaining_time / 1000)
-            time_minutes = time_val_sec // 60
-            time_seconds = time_val_sec % 60
-            time_text_render = font.render(f"Tempo: {time_minutes:02d}:{time_seconds:02d}", True, WHITE)
-            screen.blit(time_text_render, (WIDTH - time_text_render.get_width() - 10, 50))
-        elif menu_result == "game_start" and not game_started: 
-            start_prompt_text = font.render("Pressione qualquer tecla para começar", True, WHITE)
-            text_rect = start_prompt_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-            screen.blit(start_prompt_text, text_rect)
-            
-        drinks_label_render = font.render("Bebidas:", True, WHITE)
-        drinks_count_render = font.render(str(player.drinks), True, WHITE)
-        screen.blit(drinks_label_render, (10, 10))
-        screen.blit(drinks_count_render, (10 + drinks_label_render.get_width() + 5, 10))
-        
-        score_render = font.render(f"Pontuação: {score}", True, WHITE)
-        screen.blit(score_render, (10, 50))
+        # Drawing Section
+        screen.fill(BLACK) 
 
-        if phase_complete:
-            complete_text_render = font.render("FASE COMPLETA! Pressione R para continuar", True, WHITE)
-            text_rect = complete_text_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-            screen.blit(complete_text_render, text_rect)
-        
-        if game_over:
-            game_over_render = font.render("GAME OVER - Pressione R para reiniciar", True, WHITE)
-            text_rect = game_over_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-            screen.blit(game_over_render, text_rect)
+        if in_alternating_scene:
+            draw_phase_complete_alternating_scene() # Call the new drawing function
+        else:
+            # Normal game drawing
+            road.draw(screen, player.world_offset, 
+                      player.drink_effect_active,
+                      current_frame_ticks - player.drink_effect_start_time if player.drink_effect_active and player.drink_effect_start_time > 0 else 0,
+                      player.drunk_level)
             
+            for obstacle in obstacles:
+                obstacle.draw(screen)
+            
+            player.draw(screen)
+            
+            # UI Text
+            font = pygame.font.SysFont(None, 36) # Use a default system font if Arial isn't guaranteed
+            
+            if game_started : # Show time if game has started (and not in specific other states like menu prompt)
+                time_val_sec = int(remaining_time / 1000)
+                time_minutes = time_val_sec // 60
+                time_seconds = time_val_sec % 60
+                time_text_render = font.render(f"Tempo: {time_minutes:02d}:{time_seconds:02d}", True, WHITE)
+                screen.blit(time_text_render, (WIDTH - time_text_render.get_width() - 10, 50))
+            elif menu_result == "game_start" and not game_started: 
+                start_prompt_text = font.render("Pressione qualquer tecla para começar", True, WHITE)
+                text_rect = start_prompt_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+                screen.blit(start_prompt_text, text_rect)
+                
+            drinks_label_render = font.render("Bebidas:", True, WHITE)
+            drinks_count_render = font.render(str(player.drinks), True, WHITE)
+            screen.blit(drinks_label_render, (10, 10))
+            screen.blit(drinks_count_render, (10 + drinks_label_render.get_width() + 5, 10))
+            
+            score_render = font.render(f"Pontuação: {score}", True, WHITE)
+            screen.blit(score_render, (10, 50))
+
+            if phase_complete and not in_alternating_scene: # Message after exiting alternating scene
+                complete_text_render = font.render("FASE COMPLETA! Pressione R para continuar", True, WHITE)
+                text_rect = complete_text_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+                screen.blit(complete_text_render, text_rect)
+            
+            if game_over:
+                game_over_render = font.render("GAME OVER - Pressione R para reiniciar", True, WHITE)
+                text_rect = game_over_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+                screen.blit(game_over_render, text_rect)
+                
         pygame.display.flip()
-        clock.tick(FPS) # Controla o FPS, o que influencia o delta_ticks
+        clock.tick(FPS)
 
 if __name__ == "__main__":
     main()
