@@ -183,7 +183,7 @@ class Obstacle:
         # O código original tinha (player.drunk_level * 2), que é um aumento muito grande.
         # Se desejar um aumento mais suave (ex: 20% por nível), use player.drunk_level * 0.2
         # Mantendo o valor original do código fornecido:
-        speed_multiplier = 1 + (player.drunk_level * 2) 
+        speed_multiplier = 1 + (player.drunk_level * 0.6) 
         
         # A velocidade do obstáculo também varia com sua progressão na tela (efeito de perspectiva)
         current_speed = self.base_speed * (
