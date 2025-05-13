@@ -439,9 +439,8 @@ def main():
     
     if menu_result == "quit":
         pygame.quit()
-        sys.exit() # Usar sys.exit() para terminar o programa completamente
+        sys.exit()
     
-    # Configuração inicial do jogo
     clock = pygame.time.Clock()
     player = Player()
     road = Road()
@@ -453,26 +452,46 @@ def main():
     
     phase_complete = False
     game_started = False
-    phase_start_time = 0
+    
+    # Novas variáveis para o sistema de contagem de tempo corrigido
+    effective_elapsed_time = 0.0  # Tempo total "efetivo" decorrido na fase (em milissegundos)
+    last_frame_ticks = 0          # Ticks do Pygame no último quadro, para calcular o delta
+
+    remaining_time = PHASE_DURATION  # Inicializa com a duração total da fase
     
     running = True
     while running:
-        current_time = pygame.time.get_ticks()
+        current_frame_ticks = pygame.time.get_ticks()
+
+        # Inicializa last_frame_ticks no primeiro quadro ou após um reset de jogo/fase
+        if last_frame_ticks == 0: 
+            last_frame_ticks = current_frame_ticks
+
+        # Calcula o tempo real (em milissegundos) que passou desde o último quadro
+        delta_ticks = current_frame_ticks - last_frame_ticks
+        last_frame_ticks = current_frame_ticks # Atualiza para o próximo quadro
         
-        if game_started:
-            # Calcula o tempo decorrido e restante na fase, considerando o multiplicador de tempo do jogador
-            elapsed_time = (current_time - phase_start_time) * player.time_multiplier
-            remaining_time = max(0, PHASE_DURATION - elapsed_time)
+        if game_started and not game_over and not phase_complete:
+            # O tempo da fase progride
+            # Aplica o multiplicador de tempo do jogador ao delta_ticks deste quadro
+            effective_delta_ticks = delta_ticks * player.time_multiplier
+            # Acumula o tempo efetivo decorrido
+            effective_elapsed_time += effective_delta_ticks
             
-            # Verifica se a fase foi completada
-            if not phase_complete and remaining_time <= 0:
+            remaining_time = max(0, PHASE_DURATION - effective_elapsed_time)
+            
+            if remaining_time <= 0:
                 phase_complete = True
-                player.drink_effect_active = False  # Desativa o efeito de bebida ao final da fase
-                player.time_multiplier = 1.0      # Reseta o multiplicador de tempo para a próxima fase
-                # O drunk_level não é resetado aqui, persiste para a próxima fase (se houver)
-                # Outros efeitos (wave, scale_boost) serão resetados em player.update()
-        else:
-            remaining_time = PHASE_DURATION # Tempo total da fase antes de começar
+                player.drink_effect_active = False
+                player.time_multiplier = 1.0 # Reseta o multiplicador para a próxima fase ou reinício
+        elif not game_started:
+            # Se o jogo não começou, reseta o tempo
+            remaining_time = PHASE_DURATION
+            effective_elapsed_time = 0.0
+            # last_frame_ticks será atualizado para current_frame_ticks, o que é bom
+            # para evitar um delta grande quando o jogo começar de fato.
+        # Se game_over ou phase_complete, effective_elapsed_time não é incrementado,
+        # então remaining_time mantém seu valor, efetivamente "congelando" o tempo.
             
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -481,137 +500,121 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 
-                # Lógica para reiniciar o jogo após Game Over
                 if game_over and event.key == pygame.K_r:
-                    player.reset_position() # Reseta todos os atributos do jogador (incluindo efeitos de bebida, drunk_level)
+                    player.reset_position() # player.time_multiplier é resetado aqui
                     obstacles = []
-                    score = 0 # Reinicia a pontuação
+                    score = 0
                     game_over = False
                     current_spawn_rate = INITIAL_SPAWN_RATE
-                    phase_complete = False # Garante que não esteja em estado de fase completa
-                    game_started = True    # O jogo reinicia imediatamente
-                    phase_start_time = current_time # Define o novo tempo de início da fase
-                
-                # Lógica para continuar para a próxima fase (se implementado)
-                elif phase_complete and event.key == pygame.K_r:
-                    # Prepara para uma nova fase
-                    obstacles = [] # Limpa obstáculos da fase anterior
-                    # score pode continuar ou ser resetado por fase, atualmente continua
-                    current_spawn_rate = INITIAL_SPAWN_RATE # Pode ajustar a dificuldade aqui
                     phase_complete = False
-                    game_started = True # Continua o jogo
-                    phase_start_time = current_time # Define o tempo de início da nova fase
-                    # player.reset_position() NÃO é chamado aqui para manter o drunk_level
-                    # player.drink_effect_active já é False e time_multiplier é 1.0
+                    game_started = True
+                    
+                    effective_elapsed_time = 0.0 # Reseta o tempo acumulado
+                    last_frame_ticks = pygame.time.get_ticks() # Sincroniza para o reinício
+                    remaining_time = PHASE_DURATION
                 
-                # Lógica para iniciar o jogo a partir do menu ou estado inicial
+                elif phase_complete and event.key == pygame.K_r:
+                    obstacles = []
+                    current_spawn_rate = INITIAL_SPAWN_RATE
+                    phase_complete = False
+                    game_started = True
+                    # player.time_multiplier já foi resetado quando phase_complete tornou-se True
+                    
+                    effective_elapsed_time = 0.0 # Reseta para a nova fase
+                    last_frame_ticks = pygame.time.get_ticks() # Sincroniza
+                    remaining_time = PHASE_DURATION
+                
                 elif not game_started and menu_result == "game_start":
                     game_started = True
-                    phase_start_time = current_time
-                    # Processa a primeira ação do jogador que iniciou o jogo
-                    if not game_over and not phase_complete: # Garante que o jogo pode receber input
+                    effective_elapsed_time = 0.0 # Começa a contagem
+                    last_frame_ticks = pygame.time.get_ticks() # Sincroniza
+                    remaining_time = PHASE_DURATION
+                    if not game_over and not phase_complete:
                         if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                             player.move_left()
                         elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                             player.move_right()
                         elif event.key == pygame.K_f or event.key == pygame.K_SPACE:
-                            player.drink()
+                            player.drink() # player.time_multiplier é alterado aqui
                 
-                # Processa input do jogador durante o jogo
                 elif game_started and not game_over and not phase_complete:
                     if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                         player.move_left()
                     elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                         player.move_right()
                     elif event.key == pygame.K_f or event.key == pygame.K_SPACE:
-                        player.drink()
+                        player.drink() # player.time_multiplier é alterado aqui
+                                       # O efeito no tempo será aplicado no próximo cálculo de effective_delta_ticks
                         
-        # Lógica de atualização do jogo (só roda se o jogo começou, não está em game over e a fase não terminou)
         if game_started and not game_over and not phase_complete:
-            player.update() # Atualiza o estado do jogador e seus efeitos
+            player.update()
             
-            # Geração de obstáculos
             obstacle_counter += 1
             if obstacle_counter >= current_spawn_rate:
                 lane = random.randint(0, LANE_COUNT - 1)
-                # O scale_boost é acessado pelo obstáculo diretamente do player em seu update
                 obstacles.append(Obstacle(lane, player.world_offset))
                 obstacle_counter = 0
-                # Aumenta a taxa de spawn baseada na pontuação (ou outro critério)
                 if score > 0 and score % 10 == 0 and current_spawn_rate > MIN_SPAWN_RATE:
                     current_spawn_rate -= 5
             
-            # Atualiza e verifica colisões dos obstáculos
-            for i in range(len(obstacles) - 1, -1, -1): # Itera de trás para frente para remoção segura
+            for i in range(len(obstacles) - 1, -1, -1):
                 obstacle = obstacles[i]
-                if not obstacle.update(player): # Se update retorna False (ex: max_scale atingido)
+                if not obstacle.update(player):
                     obstacles.pop(i)
-                    score += 1 # Pontua por desviar/sobreviver ao obstáculo
+                    score += 1
                 elif obstacle.is_off_screen():
                     obstacles.pop(i)
-                    score += 1 # Pontua por desviar/sobreviver ao obstáculo
+                    score += 1
                 elif obstacle.collides_with(player):
                     game_over = True
-                    player.drink_effect_active = False # Desativa efeitos de bebida no game over
-                    player.time_multiplier = 1.0     # Reseta multiplicador de tempo
-                    # player.update() no próximo ciclo (se houver antes do display de game over)
-                    # ou player.reset_position() no reinício cuidará de zerar os efeitos visuais.
-                    break # Sai do loop de obstáculos após a primeira colisão
+                    player.drink_effect_active = False
+                    player.time_multiplier = 1.0 # Importante resetar aqui também
+                    break
         
-        # Renderização
-        screen.fill(BLACK) # Limpa a tela com uma cor base (opcional, se a estrada cobrir tudo)
-
+        screen.fill(BLACK)
         road.draw(screen, player.world_offset, 
-                  player.drink_effect_active, # Passa se o efeito de bebida está ativo
-                  # Tempo para animação da estrada (usa o tempo desde a última bebida para sincronia)
-                  current_time - player.drink_effect_start_time if player.drink_effect_active and player.drink_effect_start_time > 0 else 0,
+                  player.drink_effect_active,
+                  current_frame_ticks - player.drink_effect_start_time if player.drink_effect_active and player.drink_effect_start_time > 0 else 0,
                   player.drunk_level)
         
         for obstacle in obstacles:
             obstacle.draw(screen)
         
-        player.draw(screen) # Desenha o jogador com seus efeitos
+        player.draw(screen)
         
-        # Interface do Usuário (UI)
-        font = pygame.font.SysFont(None, 36) # Fonte padrão para UI
+        font = pygame.font.SysFont(None, 36)
         
-        # Exibe o tempo restante (apenas se o jogo começou)
         if game_started:
             time_val_sec = int(remaining_time / 1000)
             time_minutes = time_val_sec // 60
             time_seconds = time_val_sec % 60
             time_text_render = font.render(f"Tempo: {time_minutes:02d}:{time_seconds:02d}", True, WHITE)
             screen.blit(time_text_render, (WIDTH - time_text_render.get_width() - 10, 50))
-        # Mensagem para iniciar (se o jogo ainda não começou após o menu)
         elif menu_result == "game_start" and not game_started: 
             start_prompt_text = font.render("Pressione qualquer tecla para começar", True, WHITE)
             text_rect = start_prompt_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
             screen.blit(start_prompt_text, text_rect)
             
-        # Exibe a quantidade de bebidas restantes
         drinks_label_render = font.render("Bebidas:", True, WHITE)
         drinks_count_render = font.render(str(player.drinks), True, WHITE)
         screen.blit(drinks_label_render, (10, 10))
         screen.blit(drinks_count_render, (10 + drinks_label_render.get_width() + 5, 10))
         
-        # Exibe a pontuação
         score_render = font.render(f"Pontuação: {score}", True, WHITE)
         screen.blit(score_render, (10, 50))
 
-        # Mensagem de Fase Completa
         if phase_complete:
             complete_text_render = font.render("FASE COMPLETA! Pressione R para continuar", True, WHITE)
             text_rect = complete_text_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
             screen.blit(complete_text_render, text_rect)
         
-        # Mensagem de Game Over
         if game_over:
             game_over_render = font.render("GAME OVER - Pressione R para reiniciar", True, WHITE)
             text_rect = game_over_render.get_rect(center=(WIDTH // 2, HEIGHT // 2))
             screen.blit(game_over_render, text_rect)
             
-        pygame.display.flip() # Atualiza a tela inteira
-        clock.tick(FPS) # Controla a taxa de quadros por segundo
+        pygame.display.flip()
+        clock.tick(FPS) # Controla o FPS, o que influencia o delta_ticks
 
 if __name__ == "__main__":
     main()
