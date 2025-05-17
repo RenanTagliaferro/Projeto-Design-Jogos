@@ -7,11 +7,11 @@ class AudioPlayer:
         self.sounds = {}  # Dicionário para armazenar os sons carregados
         self.volume = 0.7  # Volume padrão
 
-    def load_sound(self, sound_name, file_path):
+    def load_sound(self, sound_name, file_path,volume):
         """Carrega um arquivo de áudio e armazena com um nome identificador"""
         try:
             sound = pygame.mixer.Sound(load_audio(file_path))
-            sound.set_volume(self.volume)
+            sound.set_volume(volume)
             self.sounds[sound_name] = sound
             print(f"Áudio '{sound_name}' carregado com sucesso!")
             return True

@@ -25,9 +25,10 @@ def main():
     current_spawn_rate = INITIAL_SPAWN_RATE
 
     #inicializa sons
-    audio.load_sound("caue", "caueta_voice.mp3")
-    audio.load_sound("gameover", "death-scream.mp3")
-    audio.load_sound("carcrash", "car-crash.mp3")
+    audio.load_sound("caue", "caueta_voice.mp3",0.8)
+    audio.load_sound("gameover", "death-scream.mp3",0.9)
+    audio.load_sound("carcrash", "car-crash.mp3",0.9)
+    audio.load_sound("carropassando", "car-pass-by.mp3",0.2)
 
 
     # Game state
@@ -168,6 +169,7 @@ def main():
                 
                 if not obstacle.update(player):
                     if obstacle.scale >= obstacle.max_scale:
+                        audio.play("carropassando")
                         # Sistema de pontos/dinheiro progressivo
                         if player.drunk_level == 0:
                             points = 1
