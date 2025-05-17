@@ -36,7 +36,7 @@ LIGHT_BLUE_BUTTON = (100, 150, 255)
 DARK_BLUE_BUTTON = (10, 20, 40)
 
 # Background settings
-BACKGROUND_SWITCH_DELAY = 1000
+BACKGROUND_SWITCH_DELAY = 300
 
 # Initialize fonts
 pygame.init()
