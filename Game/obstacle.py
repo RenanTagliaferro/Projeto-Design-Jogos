@@ -8,10 +8,10 @@ class Obstacle:
         self.lane = lane
         self.base_x = (WIDTH // 2) + (lane - 1) * (LANE_WIDTH)
         self.x = self.base_x + world_offset
-        self.y = 200
+        self.y = 190
         self.base_speed = random.uniform(2.0, 3.0)
         self.base_width = 100
-        self.base_height = 180
+        self.base_height = 100
         self.scale = 0.1
         self.image = None
         self.load_image()
