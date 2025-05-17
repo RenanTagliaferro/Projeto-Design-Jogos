@@ -2,6 +2,7 @@ import pygame
 import random
 from config import *
 from utils import load_asset
+import math
 
 class Obstacle:
     def __init__(self, lane, world_offset=0):
@@ -43,16 +44,40 @@ class Obstacle:
             return False
         return True
 
-    def draw(self, surface):
+    def draw(self, surface, drunk_level=0, effect_time=0):
         if not self.should_render or not self.image:
             return
+            
         current_width = int(self.base_width * self.scale)
         current_height = int(self.base_height * self.scale)
         if current_width <= 0 or current_height <= 0:
             return
-        scaled_img = pygame.transform.scale(self.image, (current_width, current_height))
-        img_rect = scaled_img.get_rect(center=(self.x, self.y))
-        surface.blit(scaled_img, img_rect)
+        
+        # Renderização normal se não estiver bêbado
+        if drunk_level <= 0:
+            scaled_img = pygame.transform.scale(self.image, (current_width, current_height))
+            img_rect = scaled_img.get_rect(center=(self.x, self.y))
+            surface.blit(scaled_img, img_rect)
+        else:
+            # Efeitos de embriaguez
+            temp_surface = pygame.Surface((current_width, current_height), pygame.SRCALPHA)
+            scaled_img = pygame.transform.scale(self.image, (current_width, current_height))
+            
+            # Efeito de onda
+            wave_intensity = 5 + drunk_level * 2
+            wave_speed = 0.005 + drunk_level * 0.0015
+            
+            for y in range(0, current_height, 3):
+                offset_x = wave_intensity * math.sin(y * 0.05 + effect_time * wave_speed)
+                temp_surface.blit(scaled_img, (offset_x, y), (0, y, current_width, 3))
+            
+            # Desfoque
+            blur_alpha = max(0, 200 - drunk_level * 30)
+            temp_surface.fill((255, 255, 255, blur_alpha), None, pygame.BLEND_RGBA_MULT)
+            
+            # Desenha na tela
+            img_rect = temp_surface.get_rect(center=(self.x, self.y))
+            surface.blit(temp_surface, img_rect)
 
     def is_off_screen(self):
         return self.y > HEIGHT + (self.base_height * self.scale / 2)

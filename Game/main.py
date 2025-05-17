@@ -199,7 +199,8 @@ def main():
             road.draw(screen, player.world_offset, player.drink_effect_active and player.drunk_level > 0,
                      current_frame_ticks, player.drunk_level)
             for obstacle in obstacles: 
-                obstacle.draw(screen)
+                obstacle.draw(screen, player.drunk_level if player.drink_effect_active else 0, 
+                 current_frame_ticks)
             player.draw(screen)
 
             # UI
@@ -226,7 +227,10 @@ def main():
             money_text = FONT_DEFAULT_36.render(f"Dinheiro: ${player.money}", True, WHITE)
             screen.blit(money_text, (10, 90))
 
-            drunk_limit_text = FONT_DEFAULT_24.render(f"Limite: {player.current_max_drunk_level}", True, WHITE)
+            drunk_limit_text = FONT_DEFAULT_24.render(
+                f"Bebidas: {player.drunk_level}/{player.current_max_drunk_level}", 
+                True, 
+                WHITE)
             screen.blit(drunk_limit_text, (10, 130))
 
         elif game_state == "INTERMISSION":
