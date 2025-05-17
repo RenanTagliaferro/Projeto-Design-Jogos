@@ -27,7 +27,7 @@ def main():
     game_state = "START_PROMPT"
     effective_elapsed_time = 0.0
     last_frame_ticks = 0
-    phase_duration = BASE_PHASE_DURATION  # Variável dinâmica que aumenta a cada fase
+    phase_duration = BASE_PHASE_DURATION
     remaining_time = phase_duration
 
     # Backgrounds
@@ -125,7 +125,7 @@ def main():
         if game_state == "PLAYING":
             effective_delta_ticks = delta_ticks * player.time_multiplier
             effective_elapsed_time += effective_delta_ticks
-            remaining_time = max(0, phase_duration - effective_elapsed_time)  # Calcula o tempo restante corretamente
+            remaining_time = max(0, phase_duration - effective_elapsed_time)
 
             if remaining_time <= 0:
                 game_state = "INTERMISSION"
@@ -137,10 +137,12 @@ def main():
                 player.phases_completed += 1
                 player.drinks_consumed_total += player.drinks_consumed_this_phase
 
-                money_earned = BASE_MONEY_PER_PHASE + (player.drinks_consumed_this_phase * MONEY_PER_DRINK_CONSUMED)
-                player.money += money_earned
-                money_earned_this_phase_surface = FONT_DEFAULT_36.render(f"Você ganhou: ${money_earned}", True, GREEN)
-
+                money_earned_this_phase_surface = FONT_DEFAULT_36.render(
+                    f"Total fase: ${player.score - player.last_phase_score}", 
+                    True, 
+                    GREEN
+                )
+                player.last_phase_score = player.score
                 player.drinks_consumed_this_phase = 0
                 last_background_switch_time = pygame.time.get_ticks()
 
@@ -156,18 +158,19 @@ def main():
             for i in range(len(obstacles) - 1, -1, -1):
                 obstacle = obstacles[i]
                 
-                # Atualiza o obstáculo e verifica se deve ser removido
                 if not obstacle.update(player):
-                    if obstacle.scale >= obstacle.max_scale: 
+                    if obstacle.scale >= obstacle.max_scale:
+                        # Sistema de pontos/dinheiro progressivo
                         if player.drunk_level == 0:
-                            player.score += int(BASE_POINTS * 0.5)  # 0.5x sóbrio
+                            points = 1
                         elif 2 <= player.drunk_level < 5:
-                            player.score += int(BASE_POINTS * 1.0)  # 1.0x moderado
+                            points = 3
                         elif player.drunk_level >= 5:
-                            player.score += int(BASE_POINTS * 1.5)  # 1.5x muito bêbado
-                        else:
-                            player.score += BASE_POINTS  # 1x padrão (1 bebida)
-                    obstacles.pop(i)  # Remove tanto por completar quanto por sair da tela
+                            points = 5
+                        
+                        player.score += points
+                        player.money += points  # Dinheiro = Pontos
+                    obstacles.pop(i)
                 elif obstacle.collides_with(player):
                     game_state = "GAME_OVER"
                     player.drink_effect_active = False
@@ -198,24 +201,18 @@ def main():
             player.draw(screen)
 
             # UI
-            # Tempo normalizado (0 a 1)
             progress = effective_elapsed_time / phase_duration
-
-            # Cálculo da distância com as constantes do config
             distance = int((1 - progress) * BASE_DISTANCE)
             distance = int(distance * (1 - (progress * DISTANCE_CURVE_FACTOR)))
-
-            # Aplica efeito da embriaguez
             drunk_speed_boost = 1.0 + (player.drunk_level * DRUNK_SPEED_BOOST_PER_LEVEL)
             distance = int(distance * (1.0 / drunk_speed_boost))
-
             distance = max(0, distance)
+            
             distance_text = FONT_DEFAULT_36.render(
                 f"Fase {player.phases_completed+1} | Dist: {distance}m", 
                 True, 
                 WHITE
             )
-            
             screen.blit(distance_text, (WIDTH - distance_text.get_width() - 10, 10))
 
             drinks_text = FONT_DEFAULT_36.render(f"Bebidas: {player.drinks}", True, WHITE)

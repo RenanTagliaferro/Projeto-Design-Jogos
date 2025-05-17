@@ -15,6 +15,7 @@ class Player:
         self.reset_game_state()
         self.phase_count = 0  # Contador de fases completadas
         self.current_max_drunk_level = BASE_MAX_DRUNK_LEVEL  # Limite dinâmico
+        self.last_phase_score = 0  # Adicione esta linha
 
     def reset_game_state(self):
         self.reset_position()
