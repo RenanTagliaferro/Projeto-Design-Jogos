@@ -30,7 +30,10 @@ class Road:
 
     def draw(self, surface, world_offset, drunk_effect=False, effect_time=0, drunk_level=0):
         if drunk_effect and drunk_level > 0:
-            self._draw_drunk_effect(surface, world_offset, effect_time, drunk_level)
+            if drunk_level <= EXTRA_DRUNK_EFFECT_LEVEL:
+                self._draw_drunk_effect(surface, world_offset, effect_time, drunk_level)
+            else:
+                self._draw_extra_drunk_effect(surface, world_offset, effect_time, drunk_level)
         else:
             self._draw_normal(surface, world_offset)
 
@@ -65,3 +68,28 @@ class Road:
         blur_alpha = 200 - min(150, drunk_level * 30)
         temp_surface.fill((200, 200, 255, blur_alpha), None, pygame.BLEND_RGBA_MULT)
         surface.blit(temp_surface, (0, 0))
+
+    def _draw_extra_drunk_effect(self, surface, world_offset, effect_time, drunk_level):
+        """Efeito especial para quando passar de 5 bebidas"""
+        # Efeito base (wave)
+        self._draw_drunk_effect(surface, world_offset, effect_time, drunk_level)
+        
+        # Cria uma superfície para o efeito extra
+        extra_effect = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        
+        # Efeito de cor alterada (tom avermelhado)
+        hue_shift = (effect_time * 0.01) % 360
+        color_shift = pygame.Color(0)
+        color_shift.hsva = (hue_shift, 40, 90, 30)  # Matiz variável, 40% saturação, 90% brilho, 30% alpha
+        extra_effect.fill(color_shift)
+        
+        # Efeito de desfoque radial
+        for i in range(1, 6):
+            radius = int(effect_time * 0.05 % 100 + i * 20)
+            alpha = 50 - i * 8
+            if alpha > 0:
+                blur_circle = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
+                pygame.draw.circle(blur_circle, (255, 255, 255, alpha), (radius, radius), radius)
+                extra_effect.blit(blur_circle, (WIDTH//2 - radius, HEIGHT//2 - radius))
+        
+        surface.blit(extra_effect, (0, 0))

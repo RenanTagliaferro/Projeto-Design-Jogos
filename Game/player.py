@@ -13,6 +13,8 @@ class Player:
         self.is_moving = False
         self.move_speed = 15
         self.reset_game_state()
+        self.phase_count = 0  # Contador de fases completadas
+        self.current_max_drunk_level = BASE_MAX_DRUNK_LEVEL  # Limite dinâmico
 
     def reset_game_state(self):
         self.reset_position()
@@ -21,7 +23,7 @@ class Player:
         self.drinks_consumed_this_phase = 0
         self.drinks_consumed_total = 0 
         self.phases_completed = 0      
-        self.score = 0                 
+        self.score = 0                     
 
     def reset_position(self):
         self.lane = 1
@@ -40,6 +42,8 @@ class Player:
     def prepare_for_new_driving_phase(self, drinks_to_carry_over):
         self.reset_position()
         self.drinks = drinks_to_carry_over
+        self.phase_count += 1
+        self.current_max_drunk_level = BASE_MAX_DRUNK_LEVEL + self.phase_count  # Aumenta limite a cada fase    
 
     def load_image(self):
         self.image = load_asset("player.png")
@@ -69,7 +73,7 @@ class Player:
 
     def drink(self):
         current_time = pygame.time.get_ticks()
-        if self.drinks > 0 and self.drunk_level < MAX_DRUNK_LEVEL:
+        if self.drinks > 0 and self.drunk_level < self.current_max_drunk_level:  # Usa o limite dinâmico
             self.drinks -= 1
             self.drinks_consumed_this_phase += 1
             self.drink_effect_active = True

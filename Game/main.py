@@ -16,7 +16,7 @@ def main():
     pygame.display.set_caption("Direção em Primeira Pessoa")
     clock = pygame.time.Clock()
 
-    # Initialize game objects
+    # Inicializa objetos
     player = Player()
     road = Road()
     obstacles = []
@@ -27,18 +27,19 @@ def main():
     game_state = "START_PROMPT"
     effective_elapsed_time = 0.0
     last_frame_ticks = 0
-    remaining_time = PHASE_DURATION
+    phase_duration = BASE_PHASE_DURATION  # Variável dinâmica que aumenta a cada fase
+    remaining_time = phase_duration
 
-    # Background variables
+    # Backgrounds
     current_background = "background1"
     last_background_switch_time = pygame.time.get_ticks()
 
-    # Intermission variables
+    # Tela entre as fases
     money_earned_this_phase_surface = None
     drinks_bought_for_next_phase = 0
     beverages_leftover = 0
 
-    # Buttons
+    # Botões
     intermission_buy_drink_button = Button(
         WIDTH // 2 - 150, HEIGHT - 150, 300, 50,
         f"Comprar Bebida (${COST_PER_DRINK_PURCHASE})",
@@ -49,7 +50,7 @@ def main():
         "Continuar", GREEN, LIGHT_BLUE_BUTTON, FONT_DEFAULT_32_BOLD
     )
 
-    # Show main menu
+    # Main menu
     menu_result = show_main_menu(screen)
     if menu_result == "quit":
         pygame.quit()
@@ -65,7 +66,7 @@ def main():
 
         mouse_pos = pygame.mouse.get_pos()
 
-        # Event handling
+        # Eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -78,7 +79,8 @@ def main():
                     player.reset_position()
                     effective_elapsed_time = 0.0
                     last_frame_ticks = pygame.time.get_ticks()
-                    remaining_time = PHASE_DURATION
+                    phase_duration = BASE_PHASE_DURATION
+                    remaining_time = phase_duration
 
                 elif game_state == "PLAYING":
                     if event.key == pygame.K_a or event.key == pygame.K_LEFT: 
@@ -94,7 +96,8 @@ def main():
                     current_spawn_rate = INITIAL_SPAWN_RATE
                     effective_elapsed_time = 0.0
                     last_frame_ticks = pygame.time.get_ticks()
-                    remaining_time = PHASE_DURATION
+                    phase_duration = BASE_PHASE_DURATION
+                    remaining_time = phase_duration
                     drinks_bought_for_next_phase = 0
                     beverages_leftover = 0
                     game_state = "PLAYING"
@@ -111,17 +114,18 @@ def main():
                         obstacles = []
                         effective_elapsed_time = 0.0
                         last_frame_ticks = pygame.time.get_ticks()
-                        remaining_time = PHASE_DURATION
+                        phase_duration = BASE_PHASE_DURATION + (player.phases_completed * PHASE_DURATION_INCREMENT)
+                        remaining_time = phase_duration
                         money_earned_this_phase_surface = None
                         beverages_leftover = 0
                         drinks_bought_for_next_phase = 0
                         game_state = "PLAYING"
 
-        # Game state updates
+        # Updates
         if game_state == "PLAYING":
             effective_delta_ticks = delta_ticks * player.time_multiplier
             effective_elapsed_time += effective_delta_ticks
-            remaining_time = max(0, PHASE_DURATION - effective_elapsed_time)
+            remaining_time = max(0, phase_duration - effective_elapsed_time)  # Calcula o tempo restante corretamente
 
             if remaining_time <= 0:
                 game_state = "INTERMISSION"
@@ -168,7 +172,7 @@ def main():
             intermission_continue_button.check_hover(mouse_pos)
             intermission_buy_drink_button.enabled = player.money >= COST_PER_DRINK_PURCHASE
 
-        # Drawing
+        # Renders
         screen.fill(BLACK)
 
         if game_state == "START_PROMPT":
@@ -185,11 +189,11 @@ def main():
                 obstacle.draw(screen)
             player.draw(screen)
 
-            # UI elements
+            # UI
             time_val_sec = int(remaining_time / 1000)
             time_minutes = time_val_sec // 60
             time_seconds = time_val_sec % 60
-            time_text = FONT_DEFAULT_36.render(f"Tempo: {time_minutes:02d}:{time_seconds:02d}", True, WHITE)
+            time_text = FONT_DEFAULT_36.render(f"Fase: {player.phases_completed+1} | Tempo: {time_minutes:02d}:{time_seconds:02d}", True, WHITE)
             screen.blit(time_text, (WIDTH - time_text.get_width() - 10, 10))
 
             drinks_text = FONT_DEFAULT_36.render(f"Bebidas: {player.drinks}", True, WHITE)
@@ -200,6 +204,9 @@ def main():
 
             money_text = FONT_DEFAULT_36.render(f"Dinheiro: ${player.money}", True, WHITE)
             screen.blit(money_text, (10, 90))
+
+            drunk_limit_text = FONT_DEFAULT_24.render(f"Limite: {player.current_max_drunk_level}", True, WHITE)
+            screen.blit(drunk_limit_text, (10, 130))
 
         elif game_state == "INTERMISSION":
             current_background, last_background_switch_time = draw_intermission_scene(

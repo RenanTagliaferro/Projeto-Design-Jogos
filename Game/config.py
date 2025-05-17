@@ -15,7 +15,8 @@ PLAYER_HITBOX_HEIGHT = 340
 MOVE_AMOUNT = 100
 DRINK_SCALE_BOOST = 3.0
 MAX_DRUNK_LEVEL = 5
-PHASE_DURATION = 15000
+BASE_PHASE_DURATION = 15000
+PHASE_DURATION_INCREMENT = 5000
 TIME_BOOST_PER_DRINK = 1.2
 
 # Economy settings
@@ -58,3 +59,7 @@ except Exception as e:
     FONT_MENU_TITLE = pygame.font.Font(None, 76)
     FONT_MENU_SUBTITLE = pygame.font.Font(None, 28)
     FONT_MENU_INSTRUCTIONS = pygame.font.Font(None, 20)
+
+
+BASE_MAX_DRUNK_LEVEL = 5  # Nível base inicial
+EXTRA_DRUNK_EFFECT_LEVEL = 5  # Nível a partir do qual aplicamos efeito extra
