@@ -6,9 +6,10 @@ from player import Player
 from obstacle import Obstacle
 from road import Road
 from button import Button
-from scenes.main_menu import show_main_menu
 from scenes.intermission import draw_intermission_scene
+from scenes.main_menu import show_main_menu
 from scenes.game_over import draw_game_over_scene
+from audio import playVoice
 
 def main():
     pygame.init()
@@ -105,6 +106,7 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if game_state == "INTERMISSION":
                     if intermission_buy_drink_button.check_hover(mouse_pos) and intermission_buy_drink_button.enabled:
+                        playVoice()
                         if player.money >= COST_PER_DRINK_PURCHASE:
                             player.money -= COST_PER_DRINK_PURCHASE
                             drinks_bought_for_next_phase += 1
