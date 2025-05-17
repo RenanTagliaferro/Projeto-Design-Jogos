@@ -18,6 +18,9 @@ MAX_DRUNK_LEVEL = 5
 BASE_PHASE_DURATION = 15000
 PHASE_DURATION_INCREMENT = 5000
 TIME_BOOST_PER_DRINK = 1.2
+BASE_DISTANCE = 1000  # Distância máxima em metros
+DISTANCE_CURVE_FACTOR = 0.3  # Suavização da curva (0 = linear, 0.5 = mais acentuado)
+DRUNK_SPEED_BOOST_PER_LEVEL = 0.15  # 15% mais rápido por nível de embriaguez
 
 # Economy settings
 BASE_MONEY_PER_PHASE = 5
@@ -26,6 +29,7 @@ COST_PER_DRINK_PURCHASE = 2
 INITIAL_PLAYER_MONEY = 5
 INITIAL_PLAYER_DRINKS = 2
 BASE_POINTS = 1
+DISTANCE_BASE_SPEED = 1.8  # Ajuste este valor para mudar a velocidade geral
 
 # Colors
 BLACK = (0, 0, 0)

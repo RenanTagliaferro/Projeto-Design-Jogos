@@ -198,11 +198,25 @@ def main():
             player.draw(screen)
 
             # UI
-            time_val_sec = int(remaining_time / 1000)
-            time_minutes = time_val_sec // 60
-            time_seconds = time_val_sec % 60
-            time_text = FONT_DEFAULT_36.render(f"Fase: {player.phases_completed+1} | Tempo: {time_minutes:02d}:{time_seconds:02d}", True, WHITE)
-            screen.blit(time_text, (WIDTH - time_text.get_width() - 10, 10))
+            # Tempo normalizado (0 a 1)
+            progress = effective_elapsed_time / phase_duration
+
+            # Cálculo da distância com as constantes do config
+            distance = int((1 - progress) * BASE_DISTANCE)
+            distance = int(distance * (1 - (progress * DISTANCE_CURVE_FACTOR)))
+
+            # Aplica efeito da embriaguez
+            drunk_speed_boost = 1.0 + (player.drunk_level * DRUNK_SPEED_BOOST_PER_LEVEL)
+            distance = int(distance * (1.0 / drunk_speed_boost))
+
+            distance = max(0, distance)
+            distance_text = FONT_DEFAULT_36.render(
+                f"Fase {player.phases_completed+1} | Dist: {distance}m", 
+                True, 
+                WHITE
+            )
+            
+            screen.blit(distance_text, (WIDTH - distance_text.get_width() - 10, 10))
 
             drinks_text = FONT_DEFAULT_36.render(f"Bebidas: {player.drinks}", True, WHITE)
             screen.blit(drinks_text, (10, 10))
