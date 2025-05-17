@@ -155,11 +155,19 @@ def main():
 
             for i in range(len(obstacles) - 1, -1, -1):
                 obstacle = obstacles[i]
+                
+                # Atualiza o obstáculo e verifica se deve ser removido
                 if not obstacle.update(player):
-                    obstacles.pop(i)
-                    player.score += 1
-                elif obstacle.is_off_screen():
-                    obstacles.pop(i)
+                    if obstacle.scale >= obstacle.max_scale: 
+                        if player.drunk_level == 0:
+                            player.score += int(BASE_POINTS * 0.5)  # 0.5x sóbrio
+                        elif 2 <= player.drunk_level < 5:
+                            player.score += int(BASE_POINTS * 1.0)  # 1.0x moderado
+                        elif player.drunk_level >= 5:
+                            player.score += int(BASE_POINTS * 1.5)  # 1.5x muito bêbado
+                        else:
+                            player.score += BASE_POINTS  # 1x padrão (1 bebida)
+                    obstacles.pop(i)  # Remove tanto por completar quanto por sair da tela
                 elif obstacle.collides_with(player):
                     game_state = "GAME_OVER"
                     player.drink_effect_active = False

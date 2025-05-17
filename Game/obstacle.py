@@ -27,7 +27,6 @@ class Obstacle:
             # Fallback
             self.image = pygame.Surface((self.base_width, self.base_height), pygame.SRCALPHA)
             pygame.draw.rect(self.image, (200, 0, 0), (0, 0, self.base_width, self.base_height))
-
     def update(self, player):
         self.x = self.base_x + player.world_offset
         self.should_render = abs(self.lane - player.lane) <= 1
