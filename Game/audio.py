@@ -1,34 +1,44 @@
 import pygame
-import time
 from utils import load_audio
 
-AUDIO_FILE = load_audio("caueta_voice.mp3")
-VOLUME = 0.7 
-PLAY_TIMES = 3  
-INTERVAL_SEC = 1.0
+class AudioPlayer:
+    def __init__(self):
+        pygame.mixer.init()
+        self.sounds = {}  # Dicionário para armazenar os sons carregados
+        self.volume = 0.7  # Volume padrão
 
-pygame.mixer.init()
-sound = None
+    def load_sound(self, sound_name, file_path):
+        """Carrega um arquivo de áudio e armazena com um nome identificador"""
+        try:
+            sound = pygame.mixer.Sound(load_audio(file_path))
+            sound.set_volume(self.volume)
+            self.sounds[sound_name] = sound
+            print(f"Áudio '{sound_name}' carregado com sucesso!")
+            return True
+        except Exception as e:
+            print(f"[ERRO] Não foi possível carregar {file_path}: {e}")
+            return False
 
-def _load_sound():
-    """Carrega o arquivo de áudio (chamado automaticamente)"""
-    global sound
-    try:
-        sound = pygame.mixer.Sound(AUDIO_FILE)
-        sound.set_volume(VOLUME)
-        return True
-    except Exception as e:
-        print(f"[ERRO] Não foi possível carregar {AUDIO_FILE}: {e}")
-        return False
+    def play(self, sound_name, loops=0, maxtime=0, fade_ms=0):
+        """
+        Reproduz um áudio carregado
+        Parâmetros:
+            sound_name: Nome do áudio pré-carregado
+            loops: Número de repetições (-1 para infinito)
+            maxtime: Tempo máximo de reprodução em ms
+            fade_ms: Tempo de fade-in em ms
+        """
+        if sound_name not in self.sounds:
+            print(f"[ERRO] Áudio '{sound_name}' não foi carregado")
+            return
 
-# Tenta carregar o som ao importar
-if _load_sound():
-    print(f"Áudio {AUDIO_FILE} carregado com sucesso!")
-else:
-    print(f"Falha ao carregar {AUDIO_FILE}. Verifique se o arquivo existe.")
+        self.sounds[sound_name].play(loops=loops, maxtime=maxtime, fade_ms=fade_ms)
 
-def playVoice():
-    if sound is None:
-        print("[ERRO] Áudio não carregado. Verifique o arquivo ou caminho.")
-        return
-    sound.play()
+    def set_volume(self, volume):
+        """Ajusta o volume para todos os sons (0.0 a 1.0)"""
+        self.volume = max(0.0, min(1.0, volume))
+        for sound in self.sounds.values():
+            sound.set_volume(self.volume)
+
+# Instância global pronta para uso
+audio = AudioPlayer()

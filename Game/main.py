@@ -9,7 +9,7 @@ from button import Button
 from scenes.intermission import draw_intermission_scene
 from scenes.main_menu import show_main_menu
 from scenes.game_over import draw_game_over_scene
-from audio import playVoice
+from audio import audio
 
 def main():
     pygame.init()
@@ -23,6 +23,12 @@ def main():
     obstacles = []
     obstacle_counter = 0
     current_spawn_rate = INITIAL_SPAWN_RATE
+
+    #inicializa sons
+    audio.load_sound("caue", "caueta_voice.mp3")
+    audio.load_sound("gameover", "death-scream.mp3")
+    audio.load_sound("carcrash", "car-crash.mp3")
+
 
     # Game state
     game_state = "START_PROMPT"
@@ -106,7 +112,7 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if game_state == "INTERMISSION":
                     if intermission_buy_drink_button.check_hover(mouse_pos) and intermission_buy_drink_button.enabled:
-                        playVoice()
+                        audio.play("caue",loops=2)
                         if player.money >= COST_PER_DRINK_PURCHASE:
                             player.money -= COST_PER_DRINK_PURCHASE
                             drinks_bought_for_next_phase += 1
@@ -175,6 +181,8 @@ def main():
                     obstacles.pop(i)
                 elif obstacle.collides_with(player):
                     game_state = "GAME_OVER"
+                    audio.play("gameover",loops=1)
+                    audio.play("carcrash",loops=1)
                     player.drink_effect_active = False
                     player.time_multiplier = 1.0
                     player.drunk_level = 0
