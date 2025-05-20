@@ -177,7 +177,7 @@ def main():
                             points = 3
                         elif player.drunk_level >= 5:
                             points = 5
-                        
+
                         player.score += points
                         player.money += points  # Dinheiro = Pontos
                     obstacles.pop(i)
